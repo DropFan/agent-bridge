@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Agent Bridge</title>
+  <path d="M8 42h48v8H8z" fill="#5266d5"/>
+  <path d="M14 42c2-14 8-22 18-22s16 8 18 22h-8c-2-9-5-14-10-14s-8 5-10 14z" fill="#7f8de8"/>
+  <circle cx="14" cy="46" r="6" fill="#25347f"/>
+  <circle cx="50" cy="46" r="6" fill="#25347f"/>
+</svg>

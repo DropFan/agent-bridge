@@ -6,7 +6,9 @@ Agent Bridge 是面向 DeepSeek Harness（DSH）的 Agent 环境迁移与兼容�
 
 ## 项目状态
 
-当前处于产品与技术方案阶段，尚未开始功能实现。现阶段只授权修订方案；插件实现、依赖安装和 profile 变更仍需单独确认。
+Phase 0 正在实现：工作区已包含可构建的 Cordis Host + Client bundle、只读 CLI probe、Instructions/Skills 白名单发现、DSH 兼容性评估、插件 storage、基础设置页和自动测试。
+
+当前未安装到 DSH profile，因此实际 GUI 注册、Remote 调用和真实来源扫描仍未进行运行时验证。安装插件和修改 profile 仍需单独授权。
 
 ## 当前主路径
 
@@ -54,6 +56,15 @@ Codex ───────┘
 3. 将获批内容安全导入独立 DSH 环境，并完成验证和回滚闭环。
 4. 扩展 Commands、Agent definitions、MCP/Plugin 意图、项目和对话索引。
 5. 支持从 DSH 导出到其他 Harness、记忆候选和受控自动化。
+
+## 开发验证
+
+```bash
+pnpm install
+pnpm run verify
+```
+
+`verify` 依次执行 TypeScript 检查、Vitest 测试和 Host/Client 构建。构建产物写入 `lib/`，不会自动安装或启用插件。
 
 ## License
 

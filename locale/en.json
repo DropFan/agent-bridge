@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Agent Bridge",
+    "description": "Assesses portable Claude Code and Codex data for safe migration into DeepSeek Harness."
+  }
+}

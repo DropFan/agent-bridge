@@ -3,7 +3,12 @@ node_modules/
 
 # Build output
 dist/
+lib/
 coverage/
+*.tsbuildinfo
+
+# Local package-manager store
+.pnpm-store/
 
 # Local environment and secrets
 .env
