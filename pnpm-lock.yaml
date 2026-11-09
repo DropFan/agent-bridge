@@ -21,6 +21,9 @@ importers:
       '@deepseek-ai/dsh-storage-domain':
         specifier: 0.2.2-rc.1
         version: 0.2.2-rc.1(@deepseek-ai/cordis@4.1.0)(@deepseek-ai/dsh-storage@0.2.2-rc.1(@deepseek-ai/cordis@4.1.0))
+      '@deepseek-ai/dsh-typert-generator':
+        specifier: 0.2.2-rc.1
+        version: 0.2.2-rc.1(@deepseek-ai/cordis@4.1.0)
       '@deepseek-ai/dsh-typert-protocol':
         specifier: 0.2.2-rc.1
         version: 0.2.2-rc.1(@deepseek-ai/cordis@4.1.0)
@@ -93,6 +96,11 @@ packages:
 
   '@deepseek-ai/dsh-storage@0.2.2-rc.1':
     resolution: {integrity: sha512-RkzCMDdp5dGV35lAz2ps6JP/+8L2XaFLsCfdeV461dOaA4V5AvHWIP35IIk2xdEuPEWcU93ukZnCFoaT9To0ow==}
+    peerDependencies:
+      '@deepseek-ai/cordis': ~4.1.0
+
+  '@deepseek-ai/dsh-typert-generator@0.2.2-rc.1':
+    resolution: {integrity: sha512-i+3OL5eTe+wbr4y2gbURcub9zddONuGY0MV+8HOvhJ/QV1ziNqkV8LI0s5zxmlalunO1XeZi7mVcqp17bKd6Jw==}
     peerDependencies:
       '@deepseek-ai/cordis': ~4.1.0
 
@@ -692,6 +700,11 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
+  typescript@6.0.3:
+    resolution: {integrity: sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==}
+    engines: {node: '>=14.17'}
+    hasBin: true
+
   unconfig-core@7.5.0:
     resolution: {integrity: sha512-Su3FauozOGP44ZmKdHy2oE6LPjk51M/TRRjHv2HNCWiDvfvCoxC2lno6jevMA91MYAdCdwP05QnWdWpSbncX/w==}
 
@@ -841,6 +854,12 @@ snapshots:
   '@deepseek-ai/dsh-storage@0.2.2-rc.1(@deepseek-ai/cordis@4.1.0)':
     dependencies:
       '@deepseek-ai/cordis': 4.1.0
+
+  '@deepseek-ai/dsh-typert-generator@0.2.2-rc.1(@deepseek-ai/cordis@4.1.0)':
+    dependencies:
+      '@deepseek-ai/cordis': 4.1.0
+      '@jridgewell/gen-mapping': 0.3.13
+      typescript: 6.0.3
 
   '@deepseek-ai/dsh-typert-protocol@0.2.2-rc.1(@deepseek-ai/cordis@4.1.0)':
     dependencies:
@@ -1307,6 +1326,8 @@ snapshots:
     optional: true
 
   typescript@5.9.3: {}
+
+  typescript@6.0.3: {}
 
   unconfig-core@7.5.0:
     dependencies:

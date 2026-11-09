@@ -13,8 +13,11 @@ export default defineConfig([
   },
   {
     entry: { client: 'src/client/index.ts' },
-    format: 'esm',
+    format: 'iife',
+    outputOptions: { entryFileNames: '[name].js' },
     platform: 'browser',
+    noExternal: [/^@deepseek-ai\/dsh-typert-protocol/, /^zod$/],
+    globalName: 'AgentBridgeClient',
     dts: false,
     outDir: 'lib',
     clean: false,

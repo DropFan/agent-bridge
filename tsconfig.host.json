@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "emitDeclarationOnly": true,
+    "outDir": "./.tmp/typert-types",
+    "tsBuildInfoFile": "./.tmp/typert-host.tsbuildinfo"
+  },
+  "include": ["src/host/**/*.ts", "src/application/**/*.ts", "src/core/**/*.ts", "src/security/**/*.ts", "src/shared/**/*.ts", "src/sources/**/*.ts", "src/storage/**/*.ts"]
+}
