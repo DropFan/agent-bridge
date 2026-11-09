@@ -97,8 +97,7 @@ window.__ModuleLoader__.load({
     let ctxRef: any
     let localeService: any
     async function remoteCall(method: string, payload?: unknown): Promise<any> {
-      const remote = ctxRef?.remote ?? ctxRef?.get?.('remote')
-      const namespace = remote?.agentBridge
+      const namespace = ctxRef?.remote?.agentBridge
       if (!namespace || typeof namespace[method] !== 'function') throw new Error('agent-bridge/remote-unavailable')
       const result = payload === undefined ? await namespace[method]() : await namespace[method](payload)
       if (result?.ok === false) throw new Error(result.error?.message ?? 'agent-bridge/remote-error')
@@ -106,7 +105,7 @@ window.__ModuleLoader__.load({
     }
 
     return {
-      inject: ['slots'],
+      inject: ['slots', 'remote', 'remote.agentBridge'],
       apply(ctx: any) {
         ctxRef = ctx
         localeService = ctx.get?.('locale')
