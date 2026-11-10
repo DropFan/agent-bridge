@@ -1,6 +1,7 @@
 import { defineDomain, domainTable, type Domain } from '@deepseek-ai/dsh-storage-domain'
 import { z } from 'zod'
 import type { ActivityRecord, ScanSnapshot } from '../shared/contracts.js'
+import type { ArtifactBaseline, ImportPlan } from '../planning/contracts.js'
 
 const endpointStatusSchema = z.object({
   id: z.enum(['claude-code', 'codex', 'dsh']),
@@ -68,6 +69,29 @@ const scanSchema: z.ZodType<ScanSnapshot> = z.object({
   warnings: z.array(warningSchema),
 })
 
+const baselineSchema: z.ZodType<ArtifactBaseline> = z.object({
+  key: z.string(),
+  sourceEndpointId: z.enum(['claude-code', 'codex', 'dsh']),
+  sourceHash: z.string().optional(),
+  portableHash: z.string().optional(),
+  targetHash: z.string().optional(),
+  targetRevision: z.string().optional(),
+  lastSuccessfulRunId: z.string().optional(),
+})
+
+const importPlanSchema: z.ZodType<ImportPlan> = z.object({
+  id: z.string(), createdAt: z.string(), scanId: z.string(), scanRevision: z.number().int(), targetRevision: z.string(),
+  sourceEndpointIds: z.array(z.enum(['claude-code', 'codex', 'dsh'])), targetEnvironmentIds: z.array(z.string()),
+  operations: z.array(z.object({
+    id: z.string(), artifactKey: z.string(), artifactIdentity: z.object({ kind: z.enum(['instruction', 'skill']), scope: z.enum(['user', 'project']), logicalName: z.string(), projectKey: z.string().optional() }),
+    sourceEndpointId: z.enum(['claude-code', 'codex', 'dsh']), targetEnvironmentId: z.string(), targetKind: z.enum(['system-prompt', 'skill-provider']).optional(),
+    action: z.enum(['register', 'update', 'skip']), state: z.enum(['proposed', 'unchanged', 'conflict', 'blocked', 'skipped']),
+    expectedSourceHash: z.string(), expectedTargetRevision: z.string(), beforeHash: z.string().optional(), afterHash: z.string(),
+    risk: z.enum(['low', 'medium', 'high', 'forbidden']), compatibility: artifactSchema.shape.compatibility,
+    approvalRequired: z.boolean(), reasons: z.array(z.string()),
+  })), warnings: z.array(z.string()), blockers: z.array(z.string()), digest: z.string(),
+})
+
 const activitySchema: z.ZodType<ActivityRecord> = z.object({
   id: z.string(),
   type: z.literal('scan'),
@@ -84,6 +108,8 @@ export const agentBridgeDomainSpec = defineDomain({
   invalidRecords: 'backup-and-skip',
   tables: {
     scan_snapshots: domainTable<string, ScanSnapshot>(scanSchema),
+    import_plans: domainTable<string, ImportPlan>(importPlanSchema),
+    baselines: domainTable<string, ArtifactBaseline>(baselineSchema),
     activities: domainTable<string, ActivityRecord>(activitySchema),
   },
 })
@@ -95,6 +121,10 @@ export interface BridgeRepository {
   listActivities(limit?: number): ActivityRecord[]
   saveSnapshot(snapshot: ScanSnapshot, activity: ActivityRecord): Promise<void>
   saveActivity(activity: ActivityRecord): Promise<void>
+  saveImportPlan(plan: ImportPlan): Promise<void>
+  getImportPlan(id: string): ImportPlan | undefined
+  latestImportPlan(): ImportPlan | undefined
+  baselines(): ReadonlyMap<string, ArtifactBaseline>
 }
 
 export class DomainBridgeRepository implements BridgeRepository {
@@ -124,6 +154,22 @@ export class DomainBridgeRepository implements BridgeRepository {
     await this.domain.table('activities').put(activity.id, activity)
   }
 
+  async saveImportPlan(plan: ImportPlan): Promise<void> {
+    await this.domain.table('import_plans').put(plan.id, plan)
+  }
+
+  getImportPlan(id: string): ImportPlan | undefined {
+    return this.domain.table('import_plans').get(id)
+  }
+
+  latestImportPlan(): ImportPlan | undefined {
+    return [...this.domain.table('import_plans').entries()].map(([, plan]) => plan).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
+  }
+
+  baselines(): ReadonlyMap<string, ArtifactBaseline> {
+    return new Map(this.domain.table('baselines').entries())
+  }
+
   private async prune(): Promise<void> {
     const snapshots = [...this.domain.table('scan_snapshots').entries()]
       .sort(([, a], [, b]) => b.completedAt.localeCompare(a.completedAt))
@@ -135,6 +181,8 @@ export class DomainBridgeRepository implements BridgeRepository {
 export class MemoryBridgeRepository implements BridgeRepository {
   private snapshots: ScanSnapshot[] = []
   private activities: ActivityRecord[] = []
+  private plans: ImportPlan[] = []
+  private baselineRecords = new Map<string, ArtifactBaseline>()
 
   latestSnapshot(): ScanSnapshot | undefined {
     return [...this.snapshots].sort((a, b) => b.revision - a.revision)[0]
@@ -151,5 +199,21 @@ export class MemoryBridgeRepository implements BridgeRepository {
 
   async saveActivity(activity: ActivityRecord): Promise<void> {
     this.activities = [activity, ...this.activities.filter((item) => item.id !== activity.id)]
+  }
+
+  async saveImportPlan(plan: ImportPlan): Promise<void> {
+    this.plans = [plan, ...this.plans.filter((item) => item.id !== plan.id)]
+  }
+
+  getImportPlan(id: string): ImportPlan | undefined {
+    return this.plans.find((plan) => plan.id === id)
+  }
+
+  latestImportPlan(): ImportPlan | undefined {
+    return [...this.plans].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
+  }
+
+  baselines(): ReadonlyMap<string, ArtifactBaseline> {
+    return new Map(this.baselineRecords)
   }
 }

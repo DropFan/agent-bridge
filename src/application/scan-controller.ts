@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
 import type { ActivityRecord, EndpointStatus, ScanSnapshot, ScanWarning } from '../shared/contracts.js'
+import type { ImportPlan } from '../planning/contracts.js'
 import { assessArtifacts, FileSourceAdapter } from '../sources/adapter.js'
 import type { SourceAdapter } from '../sources/types.js'
 import type { BridgeRepository } from '../storage/domain.js'
@@ -13,6 +14,7 @@ export interface ScanRequest {
 export interface Overview {
   snapshot?: ScanSnapshot | undefined
   activities: ActivityRecord[]
+  latestPlan?: ImportPlan | undefined
   running: boolean
 }
 
@@ -30,6 +32,7 @@ export class ScanController {
     return {
       ...(snapshot ? { snapshot } : {}),
       activities: this.repository.listActivities(),
+      ...(this.repository.latestImportPlan() ? { latestPlan: this.repository.latestImportPlan() } : {}),
       running: this.current !== undefined,
     }
   }
