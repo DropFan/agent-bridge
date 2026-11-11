@@ -1,11 +1,11 @@
 # Agent Bridge 产品与技术方案
 
-- 状态：方案草案 v2；Phase 0 与 Phase 1 MVP 已实现并完成本机运行验证
+- 状态：方案草案 v2；Phase 0–2 已实现并完成本机运行验证
 - 日期：2026-11-06
 - 目标宿主：DeepSeek Harness（Cordis Host + Client 插件）
 - 产品名：Agent Bridge
 
-> 当前门禁：Phase 1 仅允许发现、比较、持久化计划和过期校验；不执行任何 DSH materialization，不修改来源端，不进入 Phase 2 写入闭环。
+> 当前门禁：Phase 2 仅 materialize 用户明确确认、执行前重新校验且由 Agent Bridge 管理的 Instructions 与无脚本 Skills；不修改来源端、不传播删除、不自动处理 High/Forbidden 类别。
 
 ## 1. 产品定义
 
@@ -704,6 +704,8 @@ Host 硬依赖候选：`storageDomain`、`subprocess`。可选依赖：`configEd
 - Host 重启后的 interrupted run 诊断。
 
 验收：导入环境可选择、可停用、可验证、可回滚；不影响非 Agent Bridge 管理的数据；重复执行幂等；外部修改会被拦截。
+
+实现状态（2026-11-11）：已完成。已验证显式计划确认、执行前 Fresh 校验、path-safe storage、lease/fencing、独立 imported environment、effective preset verify、baseline 更新、Activity run、环境停用和 run 回滚；来源端保持只读。
 
 ### Phase 3：扩大迁移面与只读历史
 

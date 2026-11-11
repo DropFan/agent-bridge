@@ -2,6 +2,8 @@ import { defineDomain, domainTable, type Domain } from '@deepseek-ai/dsh-storage
 import { z } from 'zod'
 import type { ActivityRecord, ScanSnapshot } from '../shared/contracts.js'
 import type { ArtifactBaseline, ImportPlan } from '../planning/contracts.js'
+import type { ImportRun, MaterializationRecord, OperationState } from '../materialization/contracts.js'
+import { sha256 } from '../shared/hash.js'
 
 const endpointStatusSchema = z.object({
   id: z.enum(['claude-code', 'codex', 'dsh']),
@@ -92,6 +94,19 @@ const importPlanSchema: z.ZodType<ImportPlan> = z.object({
   })), warnings: z.array(z.string()), blockers: z.array(z.string()), digest: z.string(),
 })
 
+const materializationSchema: z.ZodType<MaterializationRecord> = z.object({
+  id: z.string(), artifactKey: z.string(), artifactIdentity: z.object({ kind: z.enum(['instruction', 'skill']), scope: z.enum(['user', 'project']), logicalName: z.string(), projectKey: z.string().optional() }),
+  sourceEndpointId: z.enum(['claude-code', 'codex', 'dsh']), environmentId: z.string(), targetKind: z.enum(['system-prompt', 'skill-provider']),
+  content: z.string(), contentHash: z.string(), enabled: z.boolean(), createdAt: z.string(), updatedAt: z.string(), runId: z.string(),
+})
+const runSchema: z.ZodType<ImportRun> = z.object({
+  id: z.string(), planId: z.string(), planDigest: z.string(), fence: z.number().int(), state: z.enum(['validating','materializing','verifying','completed','failed','rolled-back','rollback-failed','interrupted']),
+  startedAt: z.string(), endedAt: z.string().optional(), operationResults: z.array(z.object({ operationId: z.string(), materializationId: z.string().optional(), state: z.enum(['completed','failed','rolled-back','rollback-failed']), diagnostic: z.string().optional() })), diagnostic: z.string().optional(),
+})
+const operationStateSchema: z.ZodType<OperationState> = z.object({
+  id: z.literal('state'), nextFence: z.number().int(), lease: z.object({ runId: z.string(), fence: z.number().int(), acquiredAt: z.string() }).optional(),
+})
+
 const activitySchema: z.ZodType<ActivityRecord> = z.object({
   id: z.string(),
   type: z.literal('scan'),
@@ -109,6 +124,9 @@ export const agentBridgeDomainSpec = defineDomain({
   tables: {
     scan_snapshots: domainTable<string, ScanSnapshot>(scanSchema),
     import_plans: domainTable<string, ImportPlan>(importPlanSchema),
+    import_runs: domainTable<string, ImportRun>(runSchema),
+    materializations: domainTable<string, MaterializationRecord>(materializationSchema),
+    operation_state: domainTable<'state', OperationState>(operationStateSchema),
     baselines: domainTable<string, ArtifactBaseline>(baselineSchema),
     activities: domainTable<string, ActivityRecord>(activitySchema),
   },
@@ -125,6 +143,16 @@ export interface BridgeRepository {
   getImportPlan(id: string): ImportPlan | undefined
   latestImportPlan(): ImportPlan | undefined
   baselines(): ReadonlyMap<string, ArtifactBaseline>
+  putBaseline(baseline: ArtifactBaseline): Promise<void>
+  listMaterializations(): MaterializationRecord[]
+  putMaterialization(record: MaterializationRecord): Promise<void>
+  deleteMaterialization(id: string): Promise<boolean>
+  listRuns(): ImportRun[]
+  getRun(id: string): ImportRun | undefined
+  putRun(run: ImportRun): Promise<void>
+  initializeOperationState(): Promise<void>
+  acquireLease(runId: string): Promise<{ fence: number }>
+  releaseLease(runId: string, fence: number): Promise<void>
 }
 
 export class DomainBridgeRepository implements BridgeRepository {
@@ -166,8 +194,28 @@ export class DomainBridgeRepository implements BridgeRepository {
     return [...this.domain.table('import_plans').entries()].map(([, plan]) => plan).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
   }
 
-  baselines(): ReadonlyMap<string, ArtifactBaseline> {
-    return new Map(this.domain.table('baselines').entries())
+  baselines(): ReadonlyMap<string, ArtifactBaseline> { return new Map([...this.domain.table('baselines').entries()].map(([, value]) => [value.key, value])) }
+  putBaseline(baseline: ArtifactBaseline): Promise<void> { return this.domain.table('baselines').put(storageKey('baseline', baseline.key), baseline) }
+  listMaterializations(): MaterializationRecord[] { return [...this.domain.table('materializations').entries()].map(([, value]) => value) }
+  putMaterialization(record: MaterializationRecord): Promise<void> { return this.domain.table('materializations').put(storageKey('materialization', record.id), record) }
+  deleteMaterialization(id: string): Promise<boolean> { return this.domain.table('materializations').delete(storageKey('materialization', id)) }
+  listRuns(): ImportRun[] { return [...this.domain.table('import_runs').entries()].map(([, value]) => value).sort((a, b) => b.startedAt.localeCompare(a.startedAt)) }
+  getRun(id: string): ImportRun | undefined { return this.domain.table('import_runs').get(id) }
+  putRun(run: ImportRun): Promise<void> { return this.domain.table('import_runs').put(run.id, run) }
+  async initializeOperationState(): Promise<void> {
+    if (!this.domain.table('operation_state').get('state')) {
+      await this.domain.table('operation_state').put('state', { id: 'state', nextFence: 1 })
+    }
+  }
+  async acquireLease(runId: string): Promise<{ fence: number }> {
+    const state = await this.domain.table('operation_state').update('state', (current) => {
+      if (current.lease) throw new Error(`operation-busy:${current.lease.runId}`)
+      return { id: 'state', nextFence: current.nextFence + 1, lease: { runId, fence: current.nextFence, acquiredAt: new Date().toISOString() } }
+    })
+    return { fence: state.lease!.fence }
+  }
+  async releaseLease(runId: string, fence: number): Promise<void> {
+    await this.domain.table('operation_state').update('state', (current) => current.lease?.runId === runId && current.lease.fence === fence ? { id: 'state', nextFence: current.nextFence } : current)
   }
 
   private async prune(): Promise<void> {
@@ -178,11 +226,18 @@ export class DomainBridgeRepository implements BridgeRepository {
   }
 }
 
+function storageKey(prefix: string, businessKey: string): string {
+  return `${prefix}_${sha256(businessKey)}`
+}
+
 export class MemoryBridgeRepository implements BridgeRepository {
   private snapshots: ScanSnapshot[] = []
   private activities: ActivityRecord[] = []
   private plans: ImportPlan[] = []
   private baselineRecords = new Map<string, ArtifactBaseline>()
+  private materializationRecords = new Map<string, MaterializationRecord>()
+  private runs = new Map<string, ImportRun>()
+  private operationState: OperationState = { id: 'state', nextFence: 1 }
 
   latestSnapshot(): ScanSnapshot | undefined {
     return [...this.snapshots].sort((a, b) => b.revision - a.revision)[0]
@@ -213,7 +268,22 @@ export class MemoryBridgeRepository implements BridgeRepository {
     return [...this.plans].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0]
   }
 
-  baselines(): ReadonlyMap<string, ArtifactBaseline> {
-    return new Map(this.baselineRecords)
+  baselines(): ReadonlyMap<string, ArtifactBaseline> { return new Map(this.baselineRecords) }
+  async putBaseline(baseline: ArtifactBaseline): Promise<void> { this.baselineRecords.set(baseline.key, baseline) }
+  listMaterializations(): MaterializationRecord[] { return [...this.materializationRecords.values()] }
+  async putMaterialization(record: MaterializationRecord): Promise<void> { this.materializationRecords.set(record.id, record) }
+  async deleteMaterialization(id: string): Promise<boolean> { return this.materializationRecords.delete(id) }
+  listRuns(): ImportRun[] { return [...this.runs.values()].sort((a, b) => b.startedAt.localeCompare(a.startedAt)) }
+  getRun(id: string): ImportRun | undefined { return this.runs.get(id) }
+  async putRun(run: ImportRun): Promise<void> { this.runs.set(run.id, run) }
+  async initializeOperationState(): Promise<void> {}
+  async acquireLease(runId: string): Promise<{ fence: number }> {
+    if (this.operationState.lease) throw new Error(`operation-busy:${this.operationState.lease.runId}`)
+    const fence = this.operationState.nextFence
+    this.operationState = { id: 'state', nextFence: fence + 1, lease: { runId, fence, acquiredAt: new Date().toISOString() } }
+    return { fence }
+  }
+  async releaseLease(runId: string, fence: number): Promise<void> {
+    if (this.operationState.lease?.runId === runId && this.operationState.lease.fence === fence) this.operationState = { id: 'state', nextFence: this.operationState.nextFence }
   }
 }

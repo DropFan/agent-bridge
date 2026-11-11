@@ -6,9 +6,9 @@ Agent Bridge 是面向 DeepSeek Harness（DSH）的 Agent 环境迁移与兼容�
 
 ## 项目状态
 
-Phase 1 只读计划 MVP 已实现并安装验证：工作区包含 Cordis Host + Client bundle、只读 CLI probe、Instructions/Skills 白名单发现、DSH 兼容性评估、三路比较、不可变 Import Plan、过期校验、插件 storage、设置页和自动测试。
+Phase 2 安全导入闭环已实现并安装验证：在 Phase 1 的只读扫描、兼容性评估、三路比较和不可变 Import Plan 之上，增加显式确认、执行前重校验、operation lease/fencing、独立 DSH environments、有效状态 verify、baseline、停用和回滚。
 
-当前版本只扫描和生成计划，不会将内容注册到 DSH runtime，也不会修改 Claude Code、Codex 或项目文件。
+当前版本只 materialize Agent Bridge 自己管理的 Instructions 与无脚本 Skills；不会修改 Claude Code、Codex 或项目文件，不传播删除，也不会自动处理 High/Forbidden 类别。
 
 ## 当前主路径
 

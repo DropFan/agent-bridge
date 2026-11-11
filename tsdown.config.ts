@@ -2,7 +2,7 @@ import { defineConfig } from 'tsdown'
 
 export default defineConfig([
   {
-    entry: { index: 'src/host/index.ts' },
+    entry: { index: 'src/host/index.ts', environment: 'src/host/environment.ts' },
     format: 'esm',
     target: 'es2022',
     unbundle: true,

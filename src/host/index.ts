@@ -2,6 +2,10 @@ import { Service, type Context } from '@deepseek-ai/cordis'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import { createScanController, validateScanRequest, type Overview, type ScanRequest } from '../application/scan-controller.js'
 import { PlanController } from '../application/plan-controller.js'
+import { ImportController } from '../application/import-controller.js'
+import { MaterializationRuntime } from '../materialization/runtime.js'
+import { observeDshTarget } from '../planning/target-observer.js'
+import type { DisableEnvironmentRequest, EnvironmentView, ExecuteImportPlanRequest, ImportRun, RollbackRunRequest } from '../materialization/contracts.js'
 import type { GenerateImportPlanRequest, ImportPlan, ImportPlanValidation, ValidateImportPlanRequest } from '../planning/contracts.js'
 import { agentBridgeDomainSpec, DomainBridgeRepository } from '../storage/domain.js'
 import type { ScanSnapshot } from '../shared/contracts.js'
@@ -16,6 +20,7 @@ export class AgentBridgeService extends TypertRemoteService {
   static inject = inject
   private controller?: ReturnType<typeof createScanController>
   private planController?: PlanController
+  private importController?: ImportController
   private domain?: import('../storage/domain.js').AgentBridgeDomain
 
   constructor(ctx: Context) {
@@ -33,13 +38,17 @@ export class AgentBridgeService extends TypertRemoteService {
     this.domain = await storageDomain.open(agentBridgeDomainSpec)
     this.ctx.effect(() => () => this.domain?.close(), 'agent-bridge-storage')
     const repository = new DomainBridgeRepository(this.domain)
+    await repository.initializeOperationState()
     this.controller = createScanController(subprocess, repository, process.cwd())
-    this.planController = new PlanController(
-      repository,
-      this.ctx.get('skills') as any,
-      this.ctx.get('agentPresets') as any,
-      process.cwd(),
-    )
+    const skills = this.ctx.get('skills') as any
+    const agentPresets = this.ctx.get('agentPresets') as any
+    this.planController = new PlanController(repository, skills, agentPresets, process.cwd())
+    const runtime = new MaterializationRuntime(this.ctx)
+    this.ctx.effect(() => () => runtime.dispose(), 'agent-bridge-materializations')
+    this.importController = new ImportController(repository, runtime, {
+      observe: (signal) => observeDshTarget(skills, agentPresets, process.cwd(), signal, repository.listMaterializations()),
+    })
+    await this.importController.restore()
   }
 
   overview(): Overview {
@@ -59,6 +68,12 @@ export class AgentBridgeService extends TypertRemoteService {
     return this.requirePlanController().validate(request, signal)
   }
 
+  executePlan(request: ExecuteImportPlanRequest, signal: AbortSignal): Promise<ImportRun> { return this.requireImportController().execute(request, signal) }
+  disableEnvironment(request: DisableEnvironmentRequest): Promise<EnvironmentView[]> { return this.requireImportController().disableEnvironment(request) }
+  rollbackRun(request: RollbackRunRequest): Promise<ImportRun> { return this.requireImportController().rollback(request) }
+  environments(): EnvironmentView[] { return this.requireImportController().environments() }
+  runs(): ImportRun[] { return this.requireImportController().runs() }
+
   private requireController(): ReturnType<typeof createScanController> {
     if (!this.controller) throw new Error('Agent Bridge is not ready')
     return this.controller
@@ -68,14 +83,23 @@ export class AgentBridgeService extends TypertRemoteService {
     if (!this.planController) throw new Error('Agent Bridge planning is not ready')
     return this.planController
   }
+  private requireImportController(): ImportController {
+    if (!this.importController) throw new Error('Agent Bridge import is not ready')
+    return this.importController
+  }
 }
 
 markRemote('overview', AgentBridgeService.prototype.overview)
 markRemote('scan', AgentBridgeService.prototype.scan)
 markRemote('generatePlan', AgentBridgeService.prototype.generatePlan)
 markRemote('validatePlan', AgentBridgeService.prototype.validatePlan)
+markRemote('executePlan', AgentBridgeService.prototype.executePlan)
+markRemote('disableEnvironment', AgentBridgeService.prototype.disableEnvironment)
+markRemote('rollbackRun', AgentBridgeService.prototype.rollbackRun)
+markRemote('environments', AgentBridgeService.prototype.environments)
+markRemote('runs', AgentBridgeService.prototype.runs)
 
-function markRemote(method: 'overview' | 'scan' | 'generatePlan' | 'validatePlan', implementation: (...args: any[]) => unknown): void {
+function markRemote(method: 'overview' | 'scan' | 'generatePlan' | 'validatePlan' | 'executePlan' | 'disableEnvironment' | 'rollbackRun' | 'environments' | 'runs', implementation: (...args: any[]) => unknown): void {
   Remote(implementation, {
     kind: 'method',
     name: method,

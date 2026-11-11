@@ -9,6 +9,7 @@
   "exports": {
     ".": "./lib/index.js",
     "./client": "./lib/client.js",
+    "./environment": "./lib/environment.js",
     "./typert": {
       "types": "./lib/typert.host.d.ts",
       "default": "./lib/typert.host.js"

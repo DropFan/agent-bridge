@@ -32,7 +32,7 @@ window.__ModuleLoader__.load({
 `
     const dictionaries = {
       en: {
-        title: 'Agent Bridge', subtitle: 'Portable agent environments, reviewed before they enter DSH.', scan: 'Scan sources', scanning: 'Scanning…', plan: 'Generate plan', planning: 'Planning…', validate: 'Check freshness',
+        title: 'Agent Bridge', subtitle: 'Portable agent environments, reviewed before they enter DSH.', scan: 'Scan sources', scanning: 'Scanning…', plan: 'Generate plan', planning: 'Planning…', validate: 'Check freshness', execute: 'Execute approved changes', executing: 'Executing…', confirm: 'I reviewed this immutable plan and approve its proposed operations.', environments: 'Environments', disable: 'Disable', rollback: 'Rollback',
         overview: 'Overview', import: 'Import plan', activity: 'Activity', phase: 'Plan-only mode', detail: 'Reads source environments and stores reviewable plans. Nothing is applied to DSH.',
         empty: 'No source snapshot', emptyHint: 'Scan Claude Code and Codex to build a migration inventory.', noPlan: 'No import plan', noPlanHint: 'Scan sources, then generate a plan to review every proposed change.',
         source: 'Source', category: 'Category', target: 'Target', compatibility: 'Compatibility', result: 'Result', time: 'Time', state: 'State', action: 'Action', risk: 'Risk', reason: 'Reason',
@@ -40,7 +40,7 @@ window.__ModuleLoader__.load({
         operations: 'Operations', blockers: 'Blockers', conflicts: 'Conflicts', proposed: 'Ready', digest: 'Plan', fresh: 'Fresh', expired: 'Expired', unavailable: 'Host Remote is unavailable. Verify that the DSH API Gateway composed this plugin.',
       },
       zh: {
-        title: 'Agent Bridge', subtitle: '可移植的 Agent 环境，进入 DSH 前逐项审阅。', scan: '扫描来源', scanning: '扫描中…', plan: '生成计划', planning: '计划生成中…', validate: '检查新鲜度',
+        title: 'Agent Bridge', subtitle: '可移植的 Agent 环境，进入 DSH 前逐项审阅。', scan: '扫描来源', scanning: '扫描中…', plan: '生成计划', planning: '计划生成中…', validate: '检查新鲜度', execute: '执行已批准变更', executing: '执行中…', confirm: '我已审阅此不可变计划，并批准其中的拟议操作。', environments: '环境', disable: '停用', rollback: '回滚',
         overview: '概览', import: '导入计划', activity: '活动', phase: '仅计划模式', detail: '只读取来源环境并保存可审阅计划，不会向 DSH 应用任何内容。',
         empty: '尚无来源快照', emptyHint: '扫描 Claude Code 与 Codex，建立迁移清单。', noPlan: '尚无导入计划', noPlanHint: '先扫描来源，再生成计划以逐项审阅变更。',
         source: '来源', category: '类别', target: '目标', compatibility: '兼容性', result: '结果', time: '时间', state: '状态', action: '动作', risk: '风险', reason: '原因',
@@ -59,12 +59,17 @@ window.__ModuleLoader__.load({
       const [scanning, setScanning] = React.useState(false)
       const [planning, setPlanning] = React.useState(false)
       const [validation, setValidation] = React.useState(undefined as any)
+      const [confirmed, setConfirmed] = React.useState(false)
+      const [executing, setExecuting] = React.useState(false)
+      const [environments, setEnvironments] = React.useState([] as any[])
+      const [runs, setRuns] = React.useState([] as any[])
       const [error, setError] = React.useState('')
 
       const load = React.useCallback(async () => {
         try {
           setError('')
-          setOverview(await remoteCall('overview'))
+          const [nextOverview, nextEnvironments, nextRuns] = await Promise.all([remoteCall('overview'), remoteCall('environments'), remoteCall('runs')])
+          setOverview(nextOverview); setEnvironments(nextEnvironments); setRuns(nextRuns)
         } catch {
           setError(copy.unavailable)
         } finally {
@@ -90,6 +95,16 @@ window.__ModuleLoader__.load({
         if (!overview?.latestPlan) return
         setValidation(await remoteCall('validatePlan', { planId: overview.latestPlan.id }))
       }
+      const executePlan = async () => {
+        const plan = overview?.latestPlan
+        if (!plan || !confirmed) return
+        setExecuting(true); setError('')
+        try { await remoteCall('executePlan', { planId: plan.id, planDigest: plan.digest, confirmed: true }); setConfirmed(false); await load() }
+        catch (reason) { setError(reason instanceof Error ? reason.message : copy.unavailable) }
+        finally { setExecuting(false) }
+      }
+      const disableEnvironment = async (environmentId: string) => { await remoteCall('disableEnvironment', { environmentId }); await load() }
+      const rollbackRun = async (runId: string) => { await remoteCall('rollbackRun', { runId }); await load() }
 
       const snapshot = overview?.snapshot
       const phaseState = snapshot?.state ?? 'idle'
@@ -107,7 +122,7 @@ window.__ModuleLoader__.load({
           error ? h('p', { className: 'agent-bridge__error', role: 'alert' }, error) : h('span', { className: 'agent-bridge__meta' }, snapshot ? formatTime(snapshot.completedAt) : '—')),
         h('nav', { className: 'agent-bridge__tabs', role: 'tablist', 'aria-label': copy.title },
           ...tabs.map(([id, label]) => h('button', { key: id, className: 'agent-bridge__tab', role: 'tab', type: 'button', 'aria-selected': tab === id, onClick: () => setTab(id) }, label))),
-        h('section', { className: 'agent-bridge__panel', role: 'tabpanel', tabIndex: 0 }, renderPanel(h, tab, copy, overview, loading, validation, validatePlan)))
+        h('section', { className: 'agent-bridge__panel', role: 'tabpanel', tabIndex: 0 }, renderPanel(h, tab, copy, overview, loading, validation, validatePlan, { confirmed, setConfirmed, executing, executePlan, environments, disableEnvironment, runs, rollbackRun })))
     }
 
     function useLocale(): string {
@@ -126,13 +141,13 @@ window.__ModuleLoader__.load({
       return result?.ok === true ? result.value : result
     }
 
-    function renderPanel(h: any, tab: string, copy: Copy, overview: any, loading: boolean, validation: any, validatePlan: () => void): unknown {
+    function renderPanel(h: any, tab: string, copy: Copy, overview: any, loading: boolean, validation: any, validatePlan: () => void, execution: any): unknown {
       if (loading) return emptyState(h, '…', '')
-      if (tab === 'activity') return renderActivity(h, copy, overview?.activities ?? [])
+      if (tab === 'activity') return renderActivity(h, copy, overview?.activities ?? [], execution)
       const snapshot = overview?.snapshot
       if (!snapshot) return emptyState(h, copy.empty, copy.emptyHint)
       if (tab === 'overview') return renderOverview(h, copy, snapshot)
-      return renderPlan(h, copy, overview?.latestPlan, validation, validatePlan)
+      return renderPlan(h, copy, overview?.latestPlan, validation, validatePlan, execution)
     }
 
     function renderOverview(h: any, copy: Copy, snapshot: any): unknown {
@@ -155,7 +170,7 @@ window.__ModuleLoader__.load({
         ])))
     }
 
-    function renderPlan(h: any, copy: Copy, plan: any, validation: any, validatePlan: () => void): unknown {
+    function renderPlan(h: any, copy: Copy, plan: any, validation: any, validatePlan: () => void, execution: any): unknown {
       if (!plan) return emptyState(h, copy.noPlan, copy.noPlanHint)
       const conflicts = plan.operations.filter((item: any) => item.state === 'conflict').length
       const proposed = plan.operations.filter((item: any) => item.state === 'proposed').length
@@ -167,14 +182,18 @@ window.__ModuleLoader__.load({
             h('button', { className: 'agent-bridge__button', type: 'button', onClick: validatePlan }, copy.validate))),
         summary(h, [[plan.operations.length, copy.operations], [proposed, copy.proposed], [conflicts, copy.conflicts], [plan.blockers.length, copy.blockers]]),
         h('p', { className: 'agent-bridge__meta' }, `${copy.digest} ${plan.digest.slice(0, 12)} · ${formatTime(plan.createdAt)}`),
+        h('label', { style: { display: 'flex', alignItems: 'center', gap: 8, margin: '14px 0', fontSize: 12 } }, h('input', { type: 'checkbox', checked: execution.confirmed, onChange: (event: any) => execution.setConfirmed(event.target.checked) }), copy.confirm),
+        h('button', { className: 'agent-bridge__button agent-bridge__button--primary', type: 'button', disabled: !execution.confirmed || execution.executing || validation?.valid === false || !plan.operations.some((item: any) => item.state === 'proposed'), onClick: execution.executePlan }, execution.executing ? copy.executing : copy.execute),
         table(h, [copy.source, copy.category, copy.target, copy.state, copy.action, copy.risk, copy.reason], plan.operations.map((item: any) => [
           endpointLabel(item.sourceEndpointId), item.artifactIdentity.logicalName, h('span', { className: 'agent-bridge__mono' }, item.targetEnvironmentId), badge(h, item.state, toneFor(item.state)), item.action, badge(h, item.risk, toneFor(item.risk)), h('span', { className: 'agent-bridge__secondary' }, item.reasons.join(', ') || '—'),
         ])))
     }
 
-    function renderActivity(h: any, copy: Copy, rows: any[]): unknown {
-      if (!rows.length) return emptyState(h, copy.activityTitle, copy.activityHint)
-      return h('div', null, sectionHead(h, copy.activityTitle, copy.activityHint, `${rows.length}`), table(h, [copy.time, copy.result], rows.map((row: any) => [formatTime(row.startedAt), h('span', null, badge(h, row.state, toneFor(row.state)), ` ${row.summary}`)])))
+    function renderActivity(h: any, copy: Copy, rows: any[], execution: any): unknown {
+      return h('div', null,
+        execution.environments.length ? h('div', null, sectionHead(h, copy.environments, '', `${execution.environments.length}`), table(h, ['Environment', copy.state, copy.operations, copy.action], execution.environments.map((item: any) => [item.id, badge(h, item.enabled ? 'enabled' : 'disabled', item.enabled ? 'success' : 'neutral'), String(item.artifactCount), h('button', { className: 'agent-bridge__button', disabled: !item.enabled, onClick: () => execution.disableEnvironment(item.id) }, copy.disable)])), h('div', { style: { height: 28 } })) : null,
+        execution.runs.length ? h('div', null, sectionHead(h, 'Import runs', '', `${execution.runs.length}`), table(h, [copy.time, copy.state, copy.result, copy.action], execution.runs.map((run: any) => [formatTime(run.startedAt), badge(h, run.state, toneFor(run.state)), run.diagnostic ?? `${run.operationResults.length} operations`, h('button', { className: 'agent-bridge__button', disabled: run.state !== 'completed', onClick: () => execution.rollbackRun(run.id) }, copy.rollback)])), h('div', { style: { height: 28 } })) : null,
+        rows.length ? h('div', null, sectionHead(h, copy.activityTitle, copy.activityHint, `${rows.length}`), table(h, [copy.time, copy.result], rows.map((row: any) => [formatTime(row.startedAt), h('span', null, badge(h, row.state, toneFor(row.state)), ` ${row.summary}`)]))) : emptyState(h, copy.activityTitle, copy.activityHint))
     }
 
     function sectionHead(h: any, title: string, description: string, meta?: string): unknown {

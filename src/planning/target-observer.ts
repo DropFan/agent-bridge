@@ -1,4 +1,6 @@
 import { sha256 } from '../shared/hash.js'
+import { identityKey } from '../core/identity.js'
+import type { MaterializationRecord } from '../materialization/contracts.js'
 import type { DshTargetObservation, TargetArtifactObservation } from './contracts.js'
 
 export interface SkillsReader {
@@ -21,6 +23,7 @@ export async function observeDshTarget(
   agentPresets: AgentPresetsReader | undefined,
   cwd: string,
   signal?: AbortSignal,
+  managedRecords: readonly MaterializationRecord[] = [],
 ): Promise<DshTargetObservation> {
   const artifacts: TargetArtifactObservation[] = []
   const warnings: string[] = []
@@ -59,6 +62,16 @@ export async function observeDshTarget(
     warnings.push('dsh-agent-presets-service-unavailable')
   }
 
+  for (const record of managedRecords) {
+    if (!record.enabled) continue
+    artifacts.push({
+      key: `${record.environmentId}:${identityKey(record.artifactIdentity)}`,
+      kind: record.artifactIdentity.kind,
+      logicalName: record.artifactIdentity.logicalName,
+      contentHash: record.contentHash,
+      ownership: 'bridge-managed',
+    })
+  }
   const stable = [...artifacts].sort((a, b) => a.key.localeCompare(b.key))
   return {
     revision: sha256(JSON.stringify(stable)),

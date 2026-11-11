@@ -23,6 +23,11 @@ const scanSnapshotSchema = () => z.object({ id: z.string(), revision: z.number()
 const generatePlanRequestSchema = () => z.object({ scanRevision: z.number(), sourceEndpointIds: z.array(z.enum(['claude-code', 'codex'])).optional() })
 const validatePlanRequestSchema = () => z.object({ planId: z.string() })
 const validationSchema = () => z.object({ planId: z.string(), valid: z.boolean(), checkedAt: z.string(), reasons: z.array(z.enum(['scan-revision-changed', 'source-changed', 'target-revision-changed', 'plan-not-found'])) })
+const executeSchema = () => z.object({ planId: z.string(), planDigest: z.string(), confirmed: z.literal(true) })
+const environmentRequestSchema = () => z.object({ environmentId: z.string() })
+const runRequestSchema = () => z.object({ runId: z.string() })
+const runSchema = () => z.unknown()
+const environmentsSchema = () => z.array(z.unknown())
 const codec = (typeSymbol: string, create: () => z.ZodType) => ({ mode: 'strict' as const, typeSymbol, create })
 
 export default createTypertRemoteInfo({
@@ -32,5 +37,10 @@ export default createTypertRemoteInfo({
     'agentBridge/scan': { service: 'agentBridge', invocation: { kind: 'direct' }, parameters: [{ name: 'request', source: 'json', codec: codec('@local/agent-bridge#ScanRequest', scanRequestSchema), strictCodec: codec('@local/agent-bridge#ScanRequest', scanRequestSchema) }], cancellation: { parameter: 'signal' }, result: codec('@local/agent-bridge#ScanSnapshot', scanSnapshotSchema) },
     'agentBridge/generatePlan': { service: 'agentBridge', invocation: { kind: 'direct' }, parameters: [{ name: 'request', source: 'json', codec: codec('@local/agent-bridge#GenerateImportPlanRequest', generatePlanRequestSchema), strictCodec: codec('@local/agent-bridge#GenerateImportPlanRequest', generatePlanRequestSchema) }], cancellation: { parameter: 'signal' }, result: codec('@local/agent-bridge#ImportPlan', planSchema) },
     'agentBridge/validatePlan': { service: 'agentBridge', invocation: { kind: 'direct' }, parameters: [{ name: 'request', source: 'json', codec: codec('@local/agent-bridge#ValidateImportPlanRequest', validatePlanRequestSchema), strictCodec: codec('@local/agent-bridge#ValidateImportPlanRequest', validatePlanRequestSchema) }], cancellation: { parameter: 'signal' }, result: codec('@local/agent-bridge#ImportPlanValidation', validationSchema) },
+    'agentBridge/executePlan': { service: 'agentBridge', invocation: { kind: 'direct' }, parameters: [{ name: 'request', source: 'json', codec: codec('@local/agent-bridge#ExecuteImportPlanRequest', executeSchema), strictCodec: codec('@local/agent-bridge#ExecuteImportPlanRequest', executeSchema) }], cancellation: { parameter: 'signal' }, result: codec('@local/agent-bridge#ImportRun', runSchema) },
+    'agentBridge/disableEnvironment': { service: 'agentBridge', invocation: { kind: 'direct' }, parameters: [{ name: 'request', source: 'json', codec: codec('@local/agent-bridge#DisableEnvironmentRequest', environmentRequestSchema), strictCodec: codec('@local/agent-bridge#DisableEnvironmentRequest', environmentRequestSchema) }], result: codec('@local/agent-bridge#EnvironmentViews', environmentsSchema) },
+    'agentBridge/rollbackRun': { service: 'agentBridge', invocation: { kind: 'direct' }, parameters: [{ name: 'request', source: 'json', codec: codec('@local/agent-bridge#RollbackRunRequest', runRequestSchema), strictCodec: codec('@local/agent-bridge#RollbackRunRequest', runRequestSchema) }], result: codec('@local/agent-bridge#ImportRun', runSchema) },
+    'agentBridge/environments': { service: 'agentBridge', invocation: { kind: 'direct' }, parameters: [], result: codec('@local/agent-bridge#EnvironmentViews', environmentsSchema) },
+    'agentBridge/runs': { service: 'agentBridge', invocation: { kind: 'direct' }, parameters: [], result: codec('@local/agent-bridge#ImportRuns', () => z.array(z.unknown())) },
   },
 }, z)

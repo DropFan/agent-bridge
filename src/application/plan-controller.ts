@@ -35,7 +35,7 @@ export class PlanController {
 
   async validate(request: ValidateImportPlanRequest, signal?: AbortSignal): Promise<ImportPlanValidation> {
     if (!request || typeof request.planId !== 'string' || !request.planId) throw new Error('invalid-plan-validation-request')
-    const target = await observeDshTarget(this.skills, this.agentPresets, this.cwd, signal)
+    const target = await observeDshTarget(this.skills, this.agentPresets, this.cwd, signal, this.repository.listMaterializations())
     return validateImportPlan(
       this.repository.getImportPlan(request.planId),
       this.repository.latestSnapshot(),
@@ -47,7 +47,7 @@ export class PlanController {
     signal?.throwIfAborted()
     const snapshot = this.repository.latestSnapshot()
     if (!snapshot) throw new Error('scan-required')
-    const target = await observeDshTarget(this.skills, this.agentPresets, this.cwd, signal)
+    const target = await observeDshTarget(this.skills, this.agentPresets, this.cwd, signal, this.repository.listMaterializations())
     signal?.throwIfAborted()
     const plan = generateImportPlan(snapshot, target, this.repository.baselines(), request)
     await this.repository.saveImportPlan(plan)
