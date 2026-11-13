@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { sha256 } from '../shared/hash.js'
 import type { BridgeRepository } from '../storage/domain.js'
 import type { ScanSnapshot } from '../shared/contracts.js'
 import { planArtifactKey } from '../planning/compare.js'
@@ -7,6 +8,8 @@ import type { DshTargetObservation } from '../planning/contracts.js'
 import type {
   DisableEnvironmentRequest,
   EnvironmentView,
+  SetArtifactEnabledRequest,
+  VerifyEnvironmentRequest,
   ExecuteImportPlanRequest,
   ImportRun,
   MaterializationRecord,
@@ -110,6 +113,21 @@ export class ImportController {
     return this.environments()
   }
 
+  async setArtifactEnabled(request: SetArtifactEnabledRequest): Promise<EnvironmentView[]> {
+    if (!request?.materializationId || typeof request.enabled !== 'boolean') throw new Error('invalid-artifact-control-request')
+    const record = await this.runtime.setArtifactEnabled(request.materializationId, request.enabled)
+    await this.repository.putMaterialization(record)
+    return this.environments()
+  }
+
+  async verifyEnvironment(request: VerifyEnvironmentRequest): Promise<EnvironmentView> {
+    if (!request?.environmentId) throw new Error('invalid-verify-environment-request')
+    const result = await this.runtime.verifyEnvironment(request.environmentId)
+    const view = this.environments().find((item) => item.id === request.environmentId)
+    if (!view) throw new Error('environment-not-found')
+    return { ...view, verifyState: result.valid ? (view.enabled ? 'verified' : 'disabled') : 'degraded', verifyDiagnostic: result.diagnostic, verifiedAt: new Date().toISOString() }
+  }
+
   async rollback(request: RollbackRunRequest): Promise<ImportRun> {
     const run = this.repository.getRun(request?.runId)
     if (!run) throw new Error('run-not-found')
@@ -123,12 +141,23 @@ export class ImportController {
   environments(): EnvironmentView[] {
     const groups = new Map<string, MaterializationRecord[]>()
     for (const record of this.repository.listMaterializations()) groups.set(record.environmentId, [...groups.get(record.environmentId) ?? [], record])
-    return [...groups.entries()].map(([id, records]) => ({
-      id, enabled: records.some((item) => item.enabled), artifactCount: records.length,
-      instructionCount: records.filter((item) => item.targetKind === 'system-prompt').length,
-      skillCount: records.filter((item) => item.targetKind === 'skill-provider').length,
-      lastRunId: [...records].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0]?.runId,
-    }))
+    return [...groups.entries()].map(([id, records]) => {
+      const sorted = [...records].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      const enabled = records.some((item) => item.enabled)
+      return {
+        id, sourceEndpointId: records[0]!.sourceEndpointId, enabled, artifactCount: records.length,
+        instructionCount: records.filter((item) => item.targetKind === 'system-prompt').length,
+        skillCount: records.filter((item) => item.targetKind === 'skill-provider').length,
+        revision: sha256(JSON.stringify(records.map((item) => [item.id, item.contentHash, item.enabled]).sort())),
+        verifyState: enabled ? 'verified' : 'disabled',
+        lastRunId: sorted[0]?.runId,
+        artifacts: sorted.map((item) => ({
+          id: item.id, logicalName: item.artifactIdentity.logicalName, kind: item.artifactIdentity.kind,
+          targetKind: item.targetKind, sourceEndpointId: item.sourceEndpointId, contentHash: item.contentHash,
+          enabled: item.enabled, updatedAt: item.updatedAt, runId: item.runId,
+        })),
+      }
+    })
   }
 
   runs(): ImportRun[] { return this.repository.listRuns() }

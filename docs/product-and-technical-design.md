@@ -1,6 +1,6 @@
 # Agent Bridge 产品与技术方案
 
-- 状态：方案草案 v2；Phase 0–2 已实现并完成本机运行验证
+- 状态：方案草案 v2；Phase 0–2 与 Phase 3A-1 环境管理已实现并完成本机运行验证
 - 日期：2026-11-06
 - 目标宿主：DeepSeek Harness（Cordis Host + Client 插件）
 - 产品名：Agent Bridge
@@ -708,6 +708,10 @@ Host 硬依赖候选：`storageDomain`、`subprocess`。可选依赖：`configEd
 实现状态（2026-11-11）：已完成。已验证显式计划确认、执行前 Fresh 校验、path-safe storage、lease/fencing、独立 imported environment、effective preset verify、baseline 更新、Activity run、环境停用和 run 回滚；来源端保持只读。
 
 ### Phase 3：扩大迁移面与只读历史
+
+Phase 3A-1 实现状态（2026-11-13）：已完成独立 Environments 页面，展示来源、artifact 明细、revision、verify 状态、last run 与启停状态；支持单 environment 重验、单 artifact 停用/恢复，并在 DSH 0.2.2-rc.2 冷启动后验证 storage materialization 与 preset 恢复。
+
+后续范围：
 
 - Commands 的安全子集和 prompt wrapper；
 - Agent definitions → preset/prompt/tool policy 的受控映射；

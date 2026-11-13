@@ -6,7 +6,7 @@ Agent Bridge 是面向 DeepSeek Harness（DSH）的 Agent 环境迁移与兼容�
 
 ## 项目状态
 
-Phase 2 安全导入闭环已实现并安装验证：在 Phase 1 的只读扫描、兼容性评估、三路比较和不可变 Import Plan 之上，增加显式确认、执行前重校验、operation lease/fencing、独立 DSH environments、有效状态 verify、baseline、停用和回滚。
+Phase 3A-1 环境管理已实现并安装验证：在 Phase 2 安全导入闭环之上，增加独立 Environments 页面、来源与 artifact 明细、revision、verify 状态、last run、单 environment 重验和单 artifact 启停，并验证 DSH 冷启动后的持久化恢复。
 
 当前版本只 materialize Agent Bridge 自己管理的 Instructions 与无脚本 Skills；不会修改 Claude Code、Codex 或项目文件，不传播删除，也不会自动处理 High/Forbidden 类别。
 

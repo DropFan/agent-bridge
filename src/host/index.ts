@@ -5,7 +5,7 @@ import { PlanController } from '../application/plan-controller.js'
 import { ImportController } from '../application/import-controller.js'
 import { MaterializationRuntime } from '../materialization/runtime.js'
 import { observeDshTarget } from '../planning/target-observer.js'
-import type { DisableEnvironmentRequest, EnvironmentView, ExecuteImportPlanRequest, ImportRun, RollbackRunRequest } from '../materialization/contracts.js'
+import type { DisableEnvironmentRequest, EnvironmentView, ExecuteImportPlanRequest, ImportRun, RollbackRunRequest, SetArtifactEnabledRequest, VerifyEnvironmentRequest } from '../materialization/contracts.js'
 import type { GenerateImportPlanRequest, ImportPlan, ImportPlanValidation, ValidateImportPlanRequest } from '../planning/contracts.js'
 import { agentBridgeDomainSpec, DomainBridgeRepository } from '../storage/domain.js'
 import type { ScanSnapshot } from '../shared/contracts.js'
@@ -70,6 +70,8 @@ export class AgentBridgeService extends TypertRemoteService {
 
   executePlan(request: ExecuteImportPlanRequest, signal: AbortSignal): Promise<ImportRun> { return this.requireImportController().execute(request, signal) }
   disableEnvironment(request: DisableEnvironmentRequest): Promise<EnvironmentView[]> { return this.requireImportController().disableEnvironment(request) }
+  setArtifactEnabled(request: SetArtifactEnabledRequest): Promise<EnvironmentView[]> { return this.requireImportController().setArtifactEnabled(request) }
+  verifyEnvironment(request: VerifyEnvironmentRequest): Promise<EnvironmentView> { return this.requireImportController().verifyEnvironment(request) }
   rollbackRun(request: RollbackRunRequest): Promise<ImportRun> { return this.requireImportController().rollback(request) }
   environments(): EnvironmentView[] { return this.requireImportController().environments() }
   runs(): ImportRun[] { return this.requireImportController().runs() }
@@ -95,11 +97,13 @@ markRemote('generatePlan', AgentBridgeService.prototype.generatePlan)
 markRemote('validatePlan', AgentBridgeService.prototype.validatePlan)
 markRemote('executePlan', AgentBridgeService.prototype.executePlan)
 markRemote('disableEnvironment', AgentBridgeService.prototype.disableEnvironment)
+markRemote('setArtifactEnabled', AgentBridgeService.prototype.setArtifactEnabled)
+markRemote('verifyEnvironment', AgentBridgeService.prototype.verifyEnvironment)
 markRemote('rollbackRun', AgentBridgeService.prototype.rollbackRun)
 markRemote('environments', AgentBridgeService.prototype.environments)
 markRemote('runs', AgentBridgeService.prototype.runs)
 
-function markRemote(method: 'overview' | 'scan' | 'generatePlan' | 'validatePlan' | 'executePlan' | 'disableEnvironment' | 'rollbackRun' | 'environments' | 'runs', implementation: (...args: any[]) => unknown): void {
+function markRemote(method: 'overview' | 'scan' | 'generatePlan' | 'validatePlan' | 'executePlan' | 'disableEnvironment' | 'setArtifactEnabled' | 'verifyEnvironment' | 'rollbackRun' | 'environments' | 'runs', implementation: (...args: any[]) => unknown): void {
   Remote(implementation, {
     kind: 'method',
     name: method,

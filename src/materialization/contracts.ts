@@ -64,15 +64,42 @@ export interface DisableEnvironmentRequest {
   environmentId: string
 }
 
+export interface SetArtifactEnabledRequest {
+  materializationId: string
+  enabled: boolean
+}
+
+export interface VerifyEnvironmentRequest {
+  environmentId: string
+}
+
 export interface RollbackRunRequest {
+  runId: string
+}
+
+export interface EnvironmentArtifactView {
+  id: string
+  logicalName: string
+  kind: 'instruction' | 'skill'
+  targetKind: 'system-prompt' | 'skill-provider'
+  sourceEndpointId: EndpointKind
+  contentHash: string
+  enabled: boolean
+  updatedAt: string
   runId: string
 }
 
 export interface EnvironmentView {
   id: string
+  sourceEndpointId: EndpointKind
   enabled: boolean
   artifactCount: number
   instructionCount: number
   skillCount: number
+  revision: string
+  verifyState: 'verified' | 'degraded' | 'disabled'
+  verifyDiagnostic?: string | undefined
+  verifiedAt?: string | undefined
   lastRunId?: string | undefined
+  artifacts: EnvironmentArtifactView[]
 }

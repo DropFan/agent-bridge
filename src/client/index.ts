@@ -33,7 +33,7 @@ window.__ModuleLoader__.load({
     const dictionaries = {
       en: {
         title: 'Agent Bridge', subtitle: 'Portable agent environments, reviewed before they enter DSH.', scan: 'Scan sources', scanning: 'Scanning…', plan: 'Generate plan', planning: 'Planning…', validate: 'Check freshness', execute: 'Execute approved changes', executing: 'Executing…', confirm: 'I reviewed this immutable plan and approve its proposed operations.', environments: 'Environments', disable: 'Disable', rollback: 'Rollback',
-        overview: 'Overview', import: 'Import plan', activity: 'Activity', phase: 'Plan-only mode', detail: 'Reads source environments and stores reviewable plans. Nothing is applied to DSH.',
+        overview: 'Overview', import: 'Import plan', environmentsTab: 'Environments', activity: 'Activity', phase: 'Plan-only mode', detail: 'Reads source environments and stores reviewable plans. Nothing is applied to DSH.',
         empty: 'No source snapshot', emptyHint: 'Scan Claude Code and Codex to build a migration inventory.', noPlan: 'No import plan', noPlanHint: 'Scan sources, then generate a plan to review every proposed change.',
         source: 'Source', category: 'Category', target: 'Target', compatibility: 'Compatibility', result: 'Result', time: 'Time', state: 'State', action: 'Action', risk: 'Risk', reason: 'Reason',
         endpoints: 'Endpoint health', endpointsHint: 'Availability and versions detected during the latest scan.', inventory: 'Migration inventory', inventoryHint: 'Portable items grouped by source and DSH target.', planTitle: 'Proposed operations', planHint: 'Nothing below will execute until a later phase adds an approved apply flow.', activityTitle: 'Recent activity', activityHint: 'Read-only scans and plan generation history.',
@@ -41,7 +41,7 @@ window.__ModuleLoader__.load({
       },
       zh: {
         title: 'Agent Bridge', subtitle: '可移植的 Agent 环境，进入 DSH 前逐项审阅。', scan: '扫描来源', scanning: '扫描中…', plan: '生成计划', planning: '计划生成中…', validate: '检查新鲜度', execute: '执行已批准变更', executing: '执行中…', confirm: '我已审阅此不可变计划，并批准其中的拟议操作。', environments: '环境', disable: '停用', rollback: '回滚',
-        overview: '概览', import: '导入计划', activity: '活动', phase: '仅计划模式', detail: '只读取来源环境并保存可审阅计划，不会向 DSH 应用任何内容。',
+        overview: '概览', import: '导入计划', environmentsTab: '环境', activity: '活动', phase: '仅计划模式', detail: '只读取来源环境并保存可审阅计划，不会向 DSH 应用任何内容。',
         empty: '尚无来源快照', emptyHint: '扫描 Claude Code 与 Codex，建立迁移清单。', noPlan: '尚无导入计划', noPlanHint: '先扫描来源，再生成计划以逐项审阅变更。',
         source: '来源', category: '类别', target: '目标', compatibility: '兼容性', result: '结果', time: '时间', state: '状态', action: '动作', risk: '风险', reason: '原因',
         endpoints: '端点健康', endpointsHint: '最近一次扫描检测到的可用性与版本。', inventory: '迁移清单', inventoryHint: '按来源和 DSH 目标整理的可移植内容。', planTitle: '拟议操作', planHint: '后续阶段增加审批执行闭环前，以下内容均不会实际应用。', activityTitle: '近期活动', activityHint: '只读扫描与计划生成记录。',
@@ -104,11 +104,16 @@ window.__ModuleLoader__.load({
         finally { setExecuting(false) }
       }
       const disableEnvironment = async (environmentId: string) => { await remoteCall('disableEnvironment', { environmentId }); await load() }
+      const setArtifactEnabled = async (materializationId: string, enabled: boolean) => { await remoteCall('setArtifactEnabled', { materializationId, enabled }); await load() }
+      const verifyEnvironment = async (environmentId: string) => {
+        const next = await remoteCall('verifyEnvironment', { environmentId })
+        setEnvironments((current: any[]) => current.map((item) => item.id === environmentId ? next : item))
+      }
       const rollbackRun = async (runId: string) => { await remoteCall('rollbackRun', { runId }); await load() }
 
       const snapshot = overview?.snapshot
       const phaseState = snapshot?.state ?? 'idle'
-      const tabs = [['overview', copy.overview], ['import', copy.import], ['activity', copy.activity]]
+      const tabs = [['overview', copy.overview], ['import', copy.import], ['environments', copy.environmentsTab], ['activity', copy.activity]]
       return h('main', { className: 'agent-bridge', 'aria-labelledby': 'agent-bridge-title' },
         h('header', { className: 'agent-bridge__header' },
           h('div', { className: 'agent-bridge__identity' },
@@ -122,7 +127,7 @@ window.__ModuleLoader__.load({
           error ? h('p', { className: 'agent-bridge__error', role: 'alert' }, error) : h('span', { className: 'agent-bridge__meta' }, snapshot ? formatTime(snapshot.completedAt) : '—')),
         h('nav', { className: 'agent-bridge__tabs', role: 'tablist', 'aria-label': copy.title },
           ...tabs.map(([id, label]) => h('button', { key: id, className: 'agent-bridge__tab', role: 'tab', type: 'button', 'aria-selected': tab === id, onClick: () => setTab(id) }, label))),
-        h('section', { className: 'agent-bridge__panel', role: 'tabpanel', tabIndex: 0 }, renderPanel(h, tab, copy, overview, loading, validation, validatePlan, { confirmed, setConfirmed, executing, executePlan, environments, disableEnvironment, runs, rollbackRun })))
+        h('section', { className: 'agent-bridge__panel', role: 'tabpanel', tabIndex: 0 }, renderPanel(h, tab, copy, overview, loading, validation, validatePlan, { confirmed, setConfirmed, executing, executePlan, environments, disableEnvironment, setArtifactEnabled, verifyEnvironment, runs, rollbackRun })))
     }
 
     function useLocale(): string {
@@ -143,6 +148,7 @@ window.__ModuleLoader__.load({
 
     function renderPanel(h: any, tab: string, copy: Copy, overview: any, loading: boolean, validation: any, validatePlan: () => void, execution: any): unknown {
       if (loading) return emptyState(h, '…', '')
+      if (tab === 'environments') return renderEnvironments(h, copy, execution)
       if (tab === 'activity') return renderActivity(h, copy, overview?.activities ?? [], execution)
       const snapshot = overview?.snapshot
       if (!snapshot) return emptyState(h, copy.empty, copy.emptyHint)
@@ -189,9 +195,18 @@ window.__ModuleLoader__.load({
         ])))
     }
 
+    function renderEnvironments(h: any, copy: Copy, execution: any): unknown {
+      if (!execution.environments.length) return emptyState(h, copy.environments, copy.activityHint)
+      return h('div', null, ...execution.environments.map((environment: any) => h('section', { key: environment.id, style: { marginBottom: 30 } },
+        h('div', { className: 'agent-bridge__section-head' },
+          h('div', null, h('h2', { className: 'agent-bridge__section-title' }, environment.id), h('p', { className: 'agent-bridge__section-copy' }, `${endpointLabel(environment.sourceEndpointId)} · ${environment.revision.slice(0, 12)} · ${environment.artifactCount} artifacts`)),
+          h('div', { className: 'agent-bridge__plan-tools' }, badge(h, environment.verifyState, toneFor(environment.verifyState)), h('button', { className: 'agent-bridge__button', onClick: () => execution.verifyEnvironment(environment.id) }, copy.validate), h('button', { className: 'agent-bridge__button', disabled: !environment.enabled, onClick: () => execution.disableEnvironment(environment.id) }, copy.disable))),
+        environment.verifiedAt ? h('p', { className: 'agent-bridge__meta' }, `${formatTime(environment.verifiedAt)}${environment.verifyDiagnostic ? ` · ${environment.verifyDiagnostic}` : ''}`) : null,
+        table(h, [copy.category, copy.source, copy.state, copy.digest, copy.action], environment.artifacts.map((artifact: any) => [artifact.logicalName, endpointLabel(artifact.sourceEndpointId), badge(h, artifact.enabled ? 'enabled' : 'disabled', artifact.enabled ? 'success' : 'neutral'), h('span', { className: 'agent-bridge__mono' }, artifact.contentHash.slice(0, 12)), h('button', { className: 'agent-bridge__button', onClick: () => execution.setArtifactEnabled(artifact.id, !artifact.enabled) }, artifact.enabled ? copy.disable : 'Enable')]))) ))
+    }
+
     function renderActivity(h: any, copy: Copy, rows: any[], execution: any): unknown {
       return h('div', null,
-        execution.environments.length ? h('div', null, sectionHead(h, copy.environments, '', `${execution.environments.length}`), table(h, ['Environment', copy.state, copy.operations, copy.action], execution.environments.map((item: any) => [item.id, badge(h, item.enabled ? 'enabled' : 'disabled', item.enabled ? 'success' : 'neutral'), String(item.artifactCount), h('button', { className: 'agent-bridge__button', disabled: !item.enabled, onClick: () => execution.disableEnvironment(item.id) }, copy.disable)])), h('div', { style: { height: 28 } })) : null,
         execution.runs.length ? h('div', null, sectionHead(h, 'Import runs', '', `${execution.runs.length}`), table(h, [copy.time, copy.state, copy.result, copy.action], execution.runs.map((run: any) => [formatTime(run.startedAt), badge(h, run.state, toneFor(run.state)), run.diagnostic ?? `${run.operationResults.length} operations`, h('button', { className: 'agent-bridge__button', disabled: run.state !== 'completed', onClick: () => execution.rollbackRun(run.id) }, copy.rollback)])), h('div', { style: { height: 28 } })) : null,
         rows.length ? h('div', null, sectionHead(h, copy.activityTitle, copy.activityHint, `${rows.length}`), table(h, [copy.time, copy.result], rows.map((row: any) => [formatTime(row.startedAt), h('span', null, badge(h, row.state, toneFor(row.state)), ` ${row.summary}`)]))) : emptyState(h, copy.activityTitle, copy.activityHint))
     }

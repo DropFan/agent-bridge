@@ -33,6 +33,15 @@ export class MaterializationRuntime {
     await this.rebuild(record.environmentId)
   }
 
+  async setArtifactEnabled(id: string, enabled: boolean): Promise<MaterializationRecord> {
+    const record = this.records.get(id)
+    if (!record) throw new Error('materialization-not-found')
+    const next = { ...record, enabled, updatedAt: new Date().toISOString() }
+    this.records.set(id, next)
+    await this.rebuild(record.environmentId)
+    return next
+  }
+
   async disableEnvironment(environmentId: string): Promise<MaterializationRecord[]> {
     const changed: MaterializationRecord[] = []
     for (const record of this.records.values()) {
@@ -43,6 +52,17 @@ export class MaterializationRuntime {
     }
     await this.rebuild(environmentId)
     return changed
+  }
+
+  async verifyEnvironment(environmentId: string): Promise<{ valid: boolean; diagnostic?: string }> {
+    const records = [...this.records.values()].filter((record) => record.environmentId === environmentId)
+    const enabled = records.filter((record) => record.enabled)
+    const preset = (await this.agentPresets().compositionInventory()).find((item) => item.id === environmentId)
+    if (!enabled.length) return preset === undefined ? { valid: true } : { valid: false, diagnostic: 'disabled-environment-still-mounted' }
+    if (!preset) return { valid: false, diagnostic: 'preset-missing' }
+    if (preset.broken) return { valid: false, diagnostic: `preset-broken:${preset.broken}` }
+    if (!preset.rows.some((row) => row.moduleName === '@local/agent-bridge/environment' && row.enabled === true)) return { valid: false, diagnostic: 'environment-plugin-missing' }
+    return { valid: true }
   }
 
   async verify(record: MaterializationRecord): Promise<boolean> {
