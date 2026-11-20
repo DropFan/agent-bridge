@@ -44,7 +44,7 @@ export class ImportController {
     const runId = randomUUID()
     const lease = await this.repository.acquireLease(runId)
     const target = await this.targetObserver.observe(signal)
-    const validation = validateImportPlan(plan, this.repository.latestSnapshot(), target)
+    const validation = validateImportPlan(plan, this.repository.latestSnapshot(), target, this.repository.projectLinkRevision())
     if (!validation.valid) {
       await this.repository.releaseLease(runId, lease.fence)
       throw new Error(`plan-expired:${validation.reasons.join(',')}`)

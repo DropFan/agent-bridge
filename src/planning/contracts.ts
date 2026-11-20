@@ -64,6 +64,7 @@ export interface ImportPlan {
   createdAt: string
   scanId: string
   scanRevision: number
+  projectLinkRevision: number
   targetRevision: string
   sourceEndpointIds: EndpointKind[]
   targetEnvironmentIds: string[]
@@ -77,7 +78,7 @@ export interface ImportPlanValidation {
   planId: string
   valid: boolean
   checkedAt: string
-  reasons: Array<'scan-revision-changed' | 'source-changed' | 'target-revision-changed' | 'plan-not-found'>
+  reasons: Array<'scan-revision-changed' | 'source-changed' | 'target-revision-changed' | 'project-link-revision-changed' | 'plan-not-found'>
 }
 
 export interface GenerateImportPlanRequest {

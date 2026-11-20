@@ -22,7 +22,7 @@ function fixture() {
     artifacts: [{ artifact: { identity: { kind: 'instruction', scope: 'user', logicalName: 'CLAUDE.md' }, source: { endpointId: 'claude-code', nativeRef: '/safe', observedRevision: 'x' }, title: 'CLAUDE.md', normalizedContent: 'Use tests.', contentHash: 'hash', sensitivity: 'public', resources: [] }, compatibility: { level: 'native', targetKind: 'system-prompt', risk: 'medium', summary: '', losses: [], blockers: [] } }],
   }
   const plan: ImportPlan = {
-    id: 'plan', createdAt: '2026-01-01T00:00:02Z', scanId: 'scan', scanRevision: 1, targetRevision: 'target', sourceEndpointIds: ['claude-code'], targetEnvironmentIds: ['imported-claude-code'], warnings: [], blockers: [], digest: 'digest',
+    id: 'plan', createdAt: '2026-01-01T00:00:02Z', scanId: 'scan', scanRevision: 1, projectLinkRevision: 0, targetRevision: 'target', sourceEndpointIds: ['claude-code'], targetEnvironmentIds: ['imported-claude-code'], warnings: [], blockers: [], digest: 'digest',
     operations: [{ id: 'op', artifactKey: 'claude-code:instruction:user::CLAUDE.md', artifactIdentity: { kind: 'instruction', scope: 'user', logicalName: 'CLAUDE.md' }, sourceEndpointId: 'claude-code', targetEnvironmentId: 'imported-claude-code', targetKind: 'system-prompt', action: 'register', state: 'proposed', expectedSourceHash: 'hash', expectedTargetRevision: 'target', afterHash: 'hash', risk: 'medium', compatibility: { level: 'native', targetKind: 'system-prompt', risk: 'medium', summary: '', losses: [], blockers: [] }, approvalRequired: true, reasons: [] }],
   }
   return { repository, scan, plan }

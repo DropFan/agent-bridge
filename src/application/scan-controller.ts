@@ -7,8 +7,8 @@ import type { SourceAdapter } from '../sources/types.js'
 import type { BridgeRepository } from '../storage/domain.js'
 
 export interface ScanRequest {
-  // Phase 0 只允许扫描已由 Host 固定的当前 workspace；Remote 不接受任意路径。
   includeProject?: boolean
+  workspaceId?: string
 }
 
 export interface Overview {
@@ -24,7 +24,7 @@ export class ScanController {
   constructor(
     private readonly sources: SourceAdapter[],
     private readonly repository: BridgeRepository,
-    private readonly projectDir?: string,
+    private readonly resolveWorkspacePath: (workspaceId: string) => string | undefined,
   ) {}
 
   overview(): Overview {
@@ -39,7 +39,7 @@ export class ScanController {
 
   scan(request: ScanRequest = {}, signal?: AbortSignal): Promise<ScanSnapshot> {
     validateScanRequest(request)
-    const key = request.includeProject === false ? 'user-only' : 'user-and-project'
+    const key = request.includeProject === false || !request.workspaceId ? 'user-only' : `workspace:${request.workspaceId}`
     if (this.current) {
       if (this.current.key !== key) return Promise.reject(new Error('scan-busy'))
       return this.current.promise
@@ -66,9 +66,13 @@ export class ScanController {
         signal?.throwIfAborted()
         if (status.state !== 'available') return { status, discovered: undefined }
         try {
+          const projectDir = request.includeProject !== false && request.workspaceId
+            ? this.resolveWorkspacePath(request.workspaceId)
+            : undefined
+          if (request.workspaceId && request.includeProject !== false && !projectDir) throw new Error('workspace-not-found')
           const discovered = await source.discover({
             homeDir: homedir(),
-            ...(request.includeProject !== false && this.projectDir ? { projectDir: this.projectDir } : {}),
+            ...(projectDir ? { projectDir } : {}),
             ...(signal ? { signal } : {}),
           })
           return { status, discovered }
@@ -129,19 +133,20 @@ export class ScanController {
 export function createScanController(
   subprocess: ConstructorParameters<typeof FileSourceAdapter>[2],
   repository: BridgeRepository,
-  projectDir?: string,
+  resolveWorkspacePath: (workspaceId: string) => string | undefined,
 ): ScanController {
   return new ScanController([
     new FileSourceAdapter('claude-code', 'claude', subprocess),
     new FileSourceAdapter('codex', 'codex', subprocess),
-  ], repository, projectDir)
+  ], repository, resolveWorkspacePath)
 }
 
 export function validateScanRequest(request: ScanRequest): void {
   if (typeof request !== 'object' || request === null || Array.isArray(request)) throw new Error('invalid-scan-request')
   const keys = Object.keys(request)
-  if (keys.some((key) => key !== 'includeProject')) throw new Error('invalid-scan-request')
+  if (keys.some((key) => key !== 'includeProject' && key !== 'workspaceId')) throw new Error('invalid-scan-request')
   if (request.includeProject !== undefined && typeof request.includeProject !== 'boolean') throw new Error('invalid-scan-request')
+  if (request.workspaceId !== undefined && (typeof request.workspaceId !== 'string' || !request.workspaceId)) throw new Error('invalid-scan-request')
 }
 
 function dshEndpointStatus(): EndpointStatus {

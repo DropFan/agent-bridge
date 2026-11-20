@@ -30,6 +30,10 @@ describe('Client Remote contract', () => {
       '@local/agent-bridge#agentBridge/scan',
       '@local/agent-bridge#agentBridge/generatePlan',
       '@local/agent-bridge#agentBridge/validatePlan',
+      '@local/agent-bridge#agentBridge/discoverProjects',
+      '@local/agent-bridge#agentBridge/projectLinks',
+      '@local/agent-bridge#agentBridge/confirmProjectLink',
+      '@local/agent-bridge#agentBridge/unlinkProject',
     ])
     for (const invocation of TYPERT.invocations) {
       expect(invocation.result).toMatchObject({ mode: 'strict', typeSymbol: expect.any(String) })

@@ -18,15 +18,18 @@ const overviewSchema = () => z.object({
   snapshot: z.object({ id: z.string(), revision: z.number(), startedAt: z.string(), completedAt: z.string(), state: z.enum(['success', 'partial', 'error']), endpoints: z.array(z.unknown()), artifacts: z.array(z.unknown()), warnings: z.array(z.unknown()) }).optional(),
   activities: z.array(z.unknown()), latestPlan: planSchema().optional(), running: z.boolean(),
 })
-const scanRequestSchema = () => z.object({ includeProject: z.boolean().optional() })
+const scanRequestSchema = () => z.object({ includeProject: z.boolean().optional(), workspaceId: z.string().optional() })
 const scanSnapshotSchema = () => z.object({ id: z.string(), revision: z.number(), startedAt: z.string(), completedAt: z.string(), state: z.enum(['success', 'partial', 'error']), endpoints: z.array(z.unknown()), artifacts: z.array(z.unknown()), warnings: z.array(z.unknown()) })
 const generatePlanRequestSchema = () => z.object({ scanRevision: z.number(), sourceEndpointIds: z.array(z.enum(['claude-code', 'codex'])).optional() })
 const validatePlanRequestSchema = () => z.object({ planId: z.string() })
-const validationSchema = () => z.object({ planId: z.string(), valid: z.boolean(), checkedAt: z.string(), reasons: z.array(z.enum(['scan-revision-changed', 'source-changed', 'target-revision-changed', 'plan-not-found'])) })
+const validationSchema = () => z.object({ planId: z.string(), valid: z.boolean(), checkedAt: z.string(), reasons: z.array(z.enum(['scan-revision-changed', 'source-changed', 'target-revision-changed', 'project-link-revision-changed', 'plan-not-found'])) })
 const executeSchema = () => z.object({ planId: z.string(), planDigest: z.string(), confirmed: z.literal(true) })
 const environmentRequestSchema = () => z.object({ environmentId: z.string() })
 const artifactControlSchema = () => z.object({ materializationId: z.string(), enabled: z.boolean() })
 const runRequestSchema = () => z.object({ runId: z.string() })
+const discoverProjectsSchema = () => z.object({ workspaceId: z.string() })
+const confirmProjectSchema = () => z.object({ candidateId: z.string(), expectedRevision: z.string() })
+const unlinkProjectSchema = () => z.object({ linkId: z.string(), expectedRevision: z.number() })
 const runSchema = () => z.unknown()
 const environmentsSchema = () => z.array(z.unknown())
 const codec = (typeSymbol: string, create: () => z.ZodType) => ({ mode: 'strict' as const, typeSymbol, create })
@@ -45,5 +48,9 @@ export default createTypertRemoteInfo({
     'agentBridge/rollbackRun': { service: 'agentBridge', invocation: { kind: 'direct' }, parameters: [{ name: 'request', source: 'json', codec: codec('@local/agent-bridge#RollbackRunRequest', runRequestSchema), strictCodec: codec('@local/agent-bridge#RollbackRunRequest', runRequestSchema) }], result: codec('@local/agent-bridge#ImportRun', runSchema) },
     'agentBridge/environments': { service: 'agentBridge', invocation: { kind: 'direct' }, parameters: [], result: codec('@local/agent-bridge#EnvironmentViews', environmentsSchema) },
     'agentBridge/runs': { service: 'agentBridge', invocation: { kind: 'direct' }, parameters: [], result: codec('@local/agent-bridge#ImportRuns', () => z.array(z.unknown())) },
+    'agentBridge/discoverProjects': { service: 'agentBridge', invocation: { kind: 'direct' }, parameters: [{ name: 'request', source: 'json', codec: codec('@local/agent-bridge#DiscoverProjectsRequest', discoverProjectsSchema), strictCodec: codec('@local/agent-bridge#DiscoverProjectsRequest', discoverProjectsSchema) }], cancellation: { parameter: 'signal' }, result: codec('@local/agent-bridge#ProjectDiscoverySnapshot', () => z.unknown()) },
+    'agentBridge/projectLinks': { service: 'agentBridge', invocation: { kind: 'direct' }, parameters: [], result: codec('@local/agent-bridge#ProjectLinks', () => z.array(z.unknown())) },
+    'agentBridge/confirmProjectLink': { service: 'agentBridge', invocation: { kind: 'direct' }, parameters: [{ name: 'request', source: 'json', codec: codec('@local/agent-bridge#ConfirmProjectLinkRequest', confirmProjectSchema), strictCodec: codec('@local/agent-bridge#ConfirmProjectLinkRequest', confirmProjectSchema) }], result: codec('@local/agent-bridge#ProjectLink', () => z.unknown()) },
+    'agentBridge/unlinkProject': { service: 'agentBridge', invocation: { kind: 'direct' }, parameters: [{ name: 'request', source: 'json', codec: codec('@local/agent-bridge#UnlinkProjectRequest', unlinkProjectSchema), strictCodec: codec('@local/agent-bridge#UnlinkProjectRequest', unlinkProjectSchema) }], result: codec('@local/agent-bridge#Boolean', () => z.boolean()) },
   },
 }, z)

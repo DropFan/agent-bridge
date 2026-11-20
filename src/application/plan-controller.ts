@@ -35,11 +35,13 @@ export class PlanController {
 
   async validate(request: ValidateImportPlanRequest, signal?: AbortSignal): Promise<ImportPlanValidation> {
     if (!request || typeof request.planId !== 'string' || !request.planId) throw new Error('invalid-plan-validation-request')
-    const target = await observeDshTarget(this.skills, this.agentPresets, this.cwd, signal, this.repository.listMaterializations())
+    const snapshot = this.repository.latestSnapshot()
+    const target = await observeDshTarget(this.skills, this.agentPresets, projectCwd(snapshot) || this.cwd, signal, this.repository.listMaterializations())
     return validateImportPlan(
       this.repository.getImportPlan(request.planId),
       this.repository.latestSnapshot(),
       target,
+      this.repository.projectLinkRevision(),
     )
   }
 
@@ -47,12 +49,16 @@ export class PlanController {
     signal?.throwIfAborted()
     const snapshot = this.repository.latestSnapshot()
     if (!snapshot) throw new Error('scan-required')
-    const target = await observeDshTarget(this.skills, this.agentPresets, this.cwd, signal, this.repository.listMaterializations())
+    const target = await observeDshTarget(this.skills, this.agentPresets, projectCwd(snapshot) || this.cwd, signal, this.repository.listMaterializations())
     signal?.throwIfAborted()
-    const plan = generateImportPlan(snapshot, target, this.repository.baselines(), request)
+    const plan = generateImportPlan(snapshot, target, this.repository.baselines(), request, this.repository.projectLinkRevision())
     await this.repository.saveImportPlan(plan)
     return plan
   }
+}
+
+function projectCwd(snapshot: import('../shared/contracts.js').ScanSnapshot | undefined): string | undefined {
+  return snapshot?.artifacts.find(({ artifact }) => artifact.identity.scope === 'project')?.artifact.identity.projectKey
 }
 
 export function validateGenerateRequest(request: GenerateImportPlanRequest): void {

@@ -4,6 +4,7 @@ import type { ActivityRecord, ScanSnapshot } from '../shared/contracts.js'
 import type { ArtifactBaseline, ImportPlan } from '../planning/contracts.js'
 import type { ImportRun, MaterializationRecord, OperationState } from '../materialization/contracts.js'
 import { sha256 } from '../shared/hash.js'
+import type { ProjectLink } from '../projects/contracts.js'
 
 const endpointStatusSchema = z.object({
   id: z.enum(['claude-code', 'codex', 'dsh']),
@@ -82,7 +83,7 @@ const baselineSchema: z.ZodType<ArtifactBaseline> = z.object({
 })
 
 const importPlanSchema: z.ZodType<ImportPlan> = z.object({
-  id: z.string(), createdAt: z.string(), scanId: z.string(), scanRevision: z.number().int(), targetRevision: z.string(),
+  id: z.string(), createdAt: z.string(), scanId: z.string(), scanRevision: z.number().int(), projectLinkRevision: z.number().int(), targetRevision: z.string(),
   sourceEndpointIds: z.array(z.enum(['claude-code', 'codex', 'dsh'])), targetEnvironmentIds: z.array(z.string()),
   operations: z.array(z.object({
     id: z.string(), artifactKey: z.string(), artifactIdentity: z.object({ kind: z.enum(['instruction', 'skill']), scope: z.enum(['user', 'project']), logicalName: z.string(), projectKey: z.string().optional() }),
@@ -104,7 +105,14 @@ const runSchema: z.ZodType<ImportRun> = z.object({
   startedAt: z.string(), endedAt: z.string().optional(), operationResults: z.array(z.object({ operationId: z.string(), materializationId: z.string().optional(), state: z.enum(['completed','failed','rolled-back','rollback-failed']), diagnostic: z.string().optional() })), diagnostic: z.string().optional(),
 })
 const operationStateSchema: z.ZodType<OperationState> = z.object({
-  id: z.literal('state'), nextFence: z.number().int(), lease: z.object({ runId: z.string(), fence: z.number().int(), acquiredAt: z.string() }).optional(),
+  id: z.literal('state'), nextFence: z.number().int(), projectLinkRevision: z.number().int().optional(), lease: z.object({ runId: z.string(), fence: z.number().int(), acquiredAt: z.string() }).optional(),
+})
+
+const projectReferenceSchema = z.object({ endpointId: z.enum(['claude-code', 'codex', 'dsh']), nativePath: z.string(), canonicalPath: z.string(), repositoryRoot: z.string().optional(), gitIdentity: z.string().optional(), displayName: z.string() })
+const workspaceReferenceSchema = z.object({ workspaceId: z.string(), path: z.string(), canonicalPath: z.string(), title: z.string(), repositoryRoot: z.string().optional(), gitIdentity: z.string().optional() })
+const projectLinkSchema: z.ZodType<ProjectLink> = z.object({
+  id: z.string(), projectKey: z.string(), claudeRefs: z.array(projectReferenceSchema), codexRefs: z.array(projectReferenceSchema), dshWorkspace: workspaceReferenceSchema.optional(),
+  canonicalPath: z.string(), repositoryRoot: z.string().optional(), gitIdentity: z.string().optional(), confidence: z.enum(['exact','strong','candidate','none']), confirmedByUser: z.boolean(), revision: z.number().int(), createdAt: z.string(), updatedAt: z.string(),
 })
 
 const activitySchema: z.ZodType<ActivityRecord> = z.object({
@@ -128,6 +136,7 @@ export const agentBridgeDomainSpec = defineDomain({
     materializations: domainTable<string, MaterializationRecord>(materializationSchema),
     operation_state: domainTable<'state', OperationState>(operationStateSchema),
     baselines: domainTable<string, ArtifactBaseline>(baselineSchema),
+    project_links: domainTable<string, ProjectLink>(projectLinkSchema),
     activities: domainTable<string, ActivityRecord>(activitySchema),
   },
 })
@@ -153,6 +162,12 @@ export interface BridgeRepository {
   initializeOperationState(): Promise<void>
   acquireLease(runId: string): Promise<{ fence: number }>
   releaseLease(runId: string, fence: number): Promise<void>
+  listProjectLinks(): ProjectLink[]
+  getProjectLink(id: string): ProjectLink | undefined
+  putProjectLink(link: ProjectLink): Promise<void>
+  deleteProjectLink(id: string): Promise<boolean>
+  projectLinkRevision(): number
+  bumpProjectLinkRevision(): Promise<number>
 }
 
 export class DomainBridgeRepository implements BridgeRepository {
@@ -210,12 +225,21 @@ export class DomainBridgeRepository implements BridgeRepository {
   async acquireLease(runId: string): Promise<{ fence: number }> {
     const state = await this.domain.table('operation_state').update('state', (current) => {
       if (current.lease) throw new Error(`operation-busy:${current.lease.runId}`)
-      return { id: 'state', nextFence: current.nextFence + 1, lease: { runId, fence: current.nextFence, acquiredAt: new Date().toISOString() } }
+      return { id: 'state', nextFence: current.nextFence + 1, projectLinkRevision: current.projectLinkRevision, lease: { runId, fence: current.nextFence, acquiredAt: new Date().toISOString() } }
     })
     return { fence: state.lease!.fence }
   }
   async releaseLease(runId: string, fence: number): Promise<void> {
-    await this.domain.table('operation_state').update('state', (current) => current.lease?.runId === runId && current.lease.fence === fence ? { id: 'state', nextFence: current.nextFence } : current)
+    await this.domain.table('operation_state').update('state', (current) => current.lease?.runId === runId && current.lease.fence === fence ? { id: 'state', nextFence: current.nextFence, projectLinkRevision: current.projectLinkRevision } : current)
+  }
+  listProjectLinks(): ProjectLink[] { return [...this.domain.table('project_links').entries()].map(([, value]) => value) }
+  getProjectLink(id: string): ProjectLink | undefined { return this.domain.table('project_links').get(storageKey('project', id)) }
+  putProjectLink(link: ProjectLink): Promise<void> { return this.domain.table('project_links').put(storageKey('project', link.id), link) }
+  deleteProjectLink(id: string): Promise<boolean> { return this.domain.table('project_links').delete(storageKey('project', id)) }
+  projectLinkRevision(): number { return this.domain.table('operation_state').get('state')?.projectLinkRevision ?? 0 }
+  async bumpProjectLinkRevision(): Promise<number> {
+    const state = await this.domain.table('operation_state').update('state', (current) => ({ ...current, projectLinkRevision: (current.projectLinkRevision ?? 0) + 1 }))
+    return state.projectLinkRevision!
   }
 
   private async prune(): Promise<void> {
@@ -237,7 +261,8 @@ export class MemoryBridgeRepository implements BridgeRepository {
   private baselineRecords = new Map<string, ArtifactBaseline>()
   private materializationRecords = new Map<string, MaterializationRecord>()
   private runs = new Map<string, ImportRun>()
-  private operationState: OperationState = { id: 'state', nextFence: 1 }
+  private operationState: OperationState = { id: 'state', nextFence: 1, projectLinkRevision: 0 }
+  private projectLinks = new Map<string, ProjectLink>()
 
   latestSnapshot(): ScanSnapshot | undefined {
     return [...this.snapshots].sort((a, b) => b.revision - a.revision)[0]
@@ -284,6 +309,12 @@ export class MemoryBridgeRepository implements BridgeRepository {
     return { fence }
   }
   async releaseLease(runId: string, fence: number): Promise<void> {
-    if (this.operationState.lease?.runId === runId && this.operationState.lease.fence === fence) this.operationState = { id: 'state', nextFence: this.operationState.nextFence }
+    if (this.operationState.lease?.runId === runId && this.operationState.lease.fence === fence) this.operationState = { id: 'state', nextFence: this.operationState.nextFence, projectLinkRevision: this.operationState.projectLinkRevision }
   }
+  listProjectLinks(): ProjectLink[] { return [...this.projectLinks.values()] }
+  getProjectLink(id: string): ProjectLink | undefined { return this.projectLinks.get(id) }
+  async putProjectLink(link: ProjectLink): Promise<void> { this.projectLinks.set(link.id, link) }
+  async deleteProjectLink(id: string): Promise<boolean> { return this.projectLinks.delete(id) }
+  projectLinkRevision(): number { return this.operationState.projectLinkRevision ?? 0 }
+  async bumpProjectLinkRevision(): Promise<number> { const next = (this.operationState.projectLinkRevision ?? 0) + 1; this.operationState = { ...this.operationState, projectLinkRevision: next }; return next }
 }

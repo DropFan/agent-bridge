@@ -16,6 +16,7 @@ export function generateImportPlan(
   target: DshTargetObservation,
   baselines: ReadonlyMap<string, ArtifactBaseline>,
   request: GenerateImportPlanRequest,
+  projectLinkRevision = 0,
   now = new Date(),
 ): ImportPlan {
   if (request.scanRevision !== snapshot.revision) throw new Error('scan-revision-changed')
@@ -30,6 +31,7 @@ export function generateImportPlan(
     createdAt: now.toISOString(),
     scanId: snapshot.id,
     scanRevision: snapshot.revision,
+    projectLinkRevision,
     targetRevision: target.revision,
     sourceEndpointIds: [...selected].sort() as EndpointKind[],
     targetEnvironmentIds: [...new Set(operations.map((operation) => operation.targetEnvironmentId))].sort(),

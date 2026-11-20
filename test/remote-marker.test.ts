@@ -7,7 +7,7 @@ describe('AgentBridgeService Remote markers', () => {
     const markers = remoteMethods(Object.create(AgentBridgeService.prototype))
     expect(markers.map((marker) => marker.method)).toEqual([
       'overview', 'scan', 'generatePlan', 'validatePlan',
-      'executePlan', 'disableEnvironment', 'setArtifactEnabled', 'verifyEnvironment', 'rollbackRun', 'environments', 'runs',
+      'executePlan', 'disableEnvironment', 'setArtifactEnabled', 'verifyEnvironment', 'rollbackRun', 'environments', 'runs', 'discoverProjects', 'projectLinks', 'confirmProjectLink', 'unlinkProject',
     ])
   })
 })

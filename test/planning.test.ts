@@ -71,7 +71,7 @@ describe('Phase 1 import planning', () => {
   it('计划内容有稳定 digest 且生成后不被输入 mutation 改写', () => {
     const item = artifact()
     const scan = snapshot([item])
-    const plan = generateImportPlan(scan, target(), new Map(), { scanRevision: 3 }, new Date('2026-01-01T00:00:00Z'))
+    const plan = generateImportPlan(scan, target(), new Map(), { scanRevision: 3 }, 0, new Date('2026-01-01T00:00:00Z'))
     item.contentHash = 'mutated'
     expect(plan.operations[0]?.expectedSourceHash).toBe('source-1')
     expect(plan.digest).toHaveLength(64)

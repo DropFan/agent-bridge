@@ -6,6 +6,7 @@ export function validateImportPlan(
   plan: ImportPlan | undefined,
   snapshot: ScanSnapshot | undefined,
   target: DshTargetObservation,
+  projectLinkRevision = 0,
   checkedAt = new Date(),
 ): ImportPlanValidation {
   if (!plan) return {
@@ -28,6 +29,7 @@ export function validateImportPlan(
     }
   }
   if (target.revision !== plan.targetRevision) reasons.push('target-revision-changed')
+  if (projectLinkRevision !== plan.projectLinkRevision) reasons.push('project-link-revision-changed')
 
   return {
     planId: plan.id,

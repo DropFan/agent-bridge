@@ -47,6 +47,7 @@ export interface ImportRun {
 export interface OperationState {
   id: 'state'
   nextFence: number
+  projectLinkRevision?: number | undefined
   lease?: {
     runId: string
     fence: number

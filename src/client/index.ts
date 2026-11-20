@@ -33,7 +33,7 @@ window.__ModuleLoader__.load({
     const dictionaries = {
       en: {
         title: 'Agent Bridge', subtitle: 'Portable agent environments, reviewed before they enter DSH.', scan: 'Scan sources', scanning: 'Scanning…', plan: 'Generate plan', planning: 'Planning…', validate: 'Check freshness', execute: 'Execute approved changes', executing: 'Executing…', confirm: 'I reviewed this immutable plan and approve its proposed operations.', environments: 'Environments', disable: 'Disable', rollback: 'Rollback',
-        overview: 'Overview', import: 'Import plan', environmentsTab: 'Environments', activity: 'Activity', phase: 'Plan-only mode', detail: 'Reads source environments and stores reviewable plans. Nothing is applied to DSH.',
+        overview: 'Overview', import: 'Import plan', environmentsTab: 'Environments', projectsTab: 'Projects', activity: 'Activity', phase: 'Plan-only mode', detail: 'Reads source environments and stores reviewable plans. Nothing is applied to DSH.',
         empty: 'No source snapshot', emptyHint: 'Scan Claude Code and Codex to build a migration inventory.', noPlan: 'No import plan', noPlanHint: 'Scan sources, then generate a plan to review every proposed change.',
         source: 'Source', category: 'Category', target: 'Target', compatibility: 'Compatibility', result: 'Result', time: 'Time', state: 'State', action: 'Action', risk: 'Risk', reason: 'Reason',
         endpoints: 'Endpoint health', endpointsHint: 'Availability and versions detected during the latest scan.', inventory: 'Migration inventory', inventoryHint: 'Portable items grouped by source and DSH target.', planTitle: 'Proposed operations', planHint: 'Nothing below will execute until a later phase adds an approved apply flow.', activityTitle: 'Recent activity', activityHint: 'Read-only scans and plan generation history.',
@@ -41,7 +41,7 @@ window.__ModuleLoader__.load({
       },
       zh: {
         title: 'Agent Bridge', subtitle: '可移植的 Agent 环境，进入 DSH 前逐项审阅。', scan: '扫描来源', scanning: '扫描中…', plan: '生成计划', planning: '计划生成中…', validate: '检查新鲜度', execute: '执行已批准变更', executing: '执行中…', confirm: '我已审阅此不可变计划，并批准其中的拟议操作。', environments: '环境', disable: '停用', rollback: '回滚',
-        overview: '概览', import: '导入计划', environmentsTab: '环境', activity: '活动', phase: '仅计划模式', detail: '只读取来源环境并保存可审阅计划，不会向 DSH 应用任何内容。',
+        overview: '概览', import: '导入计划', environmentsTab: '环境', projectsTab: '项目', activity: '活动', phase: '仅计划模式', detail: '只读取来源环境并保存可审阅计划，不会向 DSH 应用任何内容。',
         empty: '尚无来源快照', emptyHint: '扫描 Claude Code 与 Codex，建立迁移清单。', noPlan: '尚无导入计划', noPlanHint: '先扫描来源，再生成计划以逐项审阅变更。',
         source: '来源', category: '类别', target: '目标', compatibility: '兼容性', result: '结果', time: '时间', state: '状态', action: '动作', risk: '风险', reason: '原因',
         endpoints: '端点健康', endpointsHint: '最近一次扫描检测到的可用性与版本。', inventory: '迁移清单', inventoryHint: '按来源和 DSH 目标整理的可移植内容。', planTitle: '拟议操作', planHint: '后续阶段增加审批执行闭环前，以下内容均不会实际应用。', activityTitle: '近期活动', activityHint: '只读扫描与计划生成记录。',
@@ -50,7 +50,7 @@ window.__ModuleLoader__.load({
     }
     type Copy = typeof dictionaries.en
 
-    function Page() {
+    function Page(props: any) {
       const locale = useLocale()
       const copy: Copy = locale.startsWith('zh') ? dictionaries.zh : dictionaries.en
       const [tab, setTab] = React.useState('overview')
@@ -63,13 +63,20 @@ window.__ModuleLoader__.load({
       const [executing, setExecuting] = React.useState(false)
       const [environments, setEnvironments] = React.useState([] as any[])
       const [runs, setRuns] = React.useState([] as any[])
+      const [projectSnapshot, setProjectSnapshot] = React.useState(undefined as any)
+      const [projectLinks, setProjectLinks] = React.useState([] as any[])
+      const workspaceSnapshot = props.useWorkspaces ? props.useWorkspaces((snapshot: any) => snapshot) : { items: [] }
+      const [selectedWorkspaceId, setSelectedWorkspaceId] = React.useState('')
+      React.useEffect(() => {
+        if (!selectedWorkspaceId && workspaceSnapshot.items?.length) setSelectedWorkspaceId(workspaceSnapshot.items[0].workspaceId)
+      }, [selectedWorkspaceId, workspaceSnapshot])
       const [error, setError] = React.useState('')
 
       const load = React.useCallback(async () => {
         try {
           setError('')
-          const [nextOverview, nextEnvironments, nextRuns] = await Promise.all([remoteCall('overview'), remoteCall('environments'), remoteCall('runs')])
-          setOverview(nextOverview); setEnvironments(nextEnvironments); setRuns(nextRuns)
+          const [nextOverview, nextEnvironments, nextRuns, nextLinks] = await Promise.all([remoteCall('overview'), remoteCall('environments'), remoteCall('runs'), remoteCall('projectLinks')])
+          setOverview(nextOverview); setEnvironments(nextEnvironments); setRuns(nextRuns); setProjectLinks(nextLinks)
         } catch {
           setError(copy.unavailable)
         } finally {
@@ -80,7 +87,7 @@ window.__ModuleLoader__.load({
 
       const scan = async () => {
         setScanning(true); setError(''); setValidation(undefined)
-        try { await remoteCall('scan', {}); await load() }
+        try { await remoteCall('scan', selectedWorkspaceId ? { workspaceId: selectedWorkspaceId } : { includeProject: false }); await load() }
         catch (reason) { setError(reason instanceof Error ? reason.message : copy.unavailable) }
         finally { setScanning(false) }
       }
@@ -110,16 +117,25 @@ window.__ModuleLoader__.load({
         setEnvironments((current: any[]) => current.map((item) => item.id === environmentId ? next : item))
       }
       const rollbackRun = async (runId: string) => { await remoteCall('rollbackRun', { runId }); await load() }
+      const discoverProjects = async () => {
+        if (!selectedWorkspaceId) throw new Error('workspace-required')
+        setProjectSnapshot(await remoteCall('discoverProjects', { workspaceId: selectedWorkspaceId }))
+      }
+      const confirmProjectLink = async (candidateId: string) => { await remoteCall('confirmProjectLink', { candidateId, expectedRevision: projectSnapshot.revision }); await Promise.all([discoverProjects(), load()]) }
+      const unlinkProject = async (linkId: string, expectedRevision: number) => { await remoteCall('unlinkProject', { linkId, expectedRevision }); await Promise.all([discoverProjects(), load()]) }
 
       const snapshot = overview?.snapshot
       const phaseState = snapshot?.state ?? 'idle'
-      const tabs = [['overview', copy.overview], ['import', copy.import], ['environments', copy.environmentsTab], ['activity', copy.activity]]
+      const tabs = [['overview', copy.overview], ['import', copy.import], ['environments', copy.environmentsTab], ['projects', copy.projectsTab], ['activity', copy.activity]]
       return h('main', { className: 'agent-bridge', 'aria-labelledby': 'agent-bridge-title' },
         h('header', { className: 'agent-bridge__header' },
           h('div', { className: 'agent-bridge__identity' },
             h('div', { className: 'agent-bridge__title-row' }, h('h1', { id: 'agent-bridge-title', className: 'agent-bridge__title' }, copy.title), h('span', { className: 'agent-bridge__version' }, 'Phase 1')),
             h('p', { className: 'agent-bridge__subtitle' }, copy.subtitle)),
           h('div', { className: 'agent-bridge__actions' },
+            h('select', { className: 'agent-bridge__button', value: selectedWorkspaceId, onChange: (event: any) => { setSelectedWorkspaceId(event.target.value); setProjectSnapshot(undefined) }, 'aria-label': 'DSH Workspace' },
+              h('option', { value: '' }, 'User scope only'),
+              ...((workspaceSnapshot.items ?? []).map((item: any) => h('option', { key: item.workspaceId, value: item.workspaceId }, item.title)))),
             h('button', { className: 'agent-bridge__button', type: 'button', disabled: scanning, onClick: scan }, scanning ? copy.scanning : copy.scan),
             h('button', { className: 'agent-bridge__button agent-bridge__button--primary', type: 'button', disabled: planning || !snapshot, onClick: generatePlan }, planning ? copy.planning : copy.plan))),
         h('div', { className: 'agent-bridge__health', 'aria-live': 'polite' },
@@ -127,7 +143,7 @@ window.__ModuleLoader__.load({
           error ? h('p', { className: 'agent-bridge__error', role: 'alert' }, error) : h('span', { className: 'agent-bridge__meta' }, snapshot ? formatTime(snapshot.completedAt) : '—')),
         h('nav', { className: 'agent-bridge__tabs', role: 'tablist', 'aria-label': copy.title },
           ...tabs.map(([id, label]) => h('button', { key: id, className: 'agent-bridge__tab', role: 'tab', type: 'button', 'aria-selected': tab === id, onClick: () => setTab(id) }, label))),
-        h('section', { className: 'agent-bridge__panel', role: 'tabpanel', tabIndex: 0 }, renderPanel(h, tab, copy, overview, loading, validation, validatePlan, { confirmed, setConfirmed, executing, executePlan, environments, disableEnvironment, setArtifactEnabled, verifyEnvironment, runs, rollbackRun })))
+        h('section', { className: 'agent-bridge__panel', role: 'tabpanel', tabIndex: 0 }, renderPanel(h, tab, copy, overview, loading, validation, validatePlan, { confirmed, setConfirmed, executing, executePlan, environments, disableEnvironment, setArtifactEnabled, verifyEnvironment, runs, rollbackRun, projectSnapshot, projectLinks, discoverProjects, confirmProjectLink, unlinkProject })))
     }
 
     function useLocale(): string {
@@ -149,6 +165,7 @@ window.__ModuleLoader__.load({
     function renderPanel(h: any, tab: string, copy: Copy, overview: any, loading: boolean, validation: any, validatePlan: () => void, execution: any): unknown {
       if (loading) return emptyState(h, '…', '')
       if (tab === 'environments') return renderEnvironments(h, copy, execution)
+      if (tab === 'projects') return renderProjects(h, copy, execution)
       if (tab === 'activity') return renderActivity(h, copy, overview?.activities ?? [], execution)
       const snapshot = overview?.snapshot
       if (!snapshot) return emptyState(h, copy.empty, copy.emptyHint)
@@ -205,6 +222,23 @@ window.__ModuleLoader__.load({
         table(h, [copy.category, copy.source, copy.state, copy.digest, copy.action], environment.artifacts.map((artifact: any) => [artifact.logicalName, endpointLabel(artifact.sourceEndpointId), badge(h, artifact.enabled ? 'enabled' : 'disabled', artifact.enabled ? 'success' : 'neutral'), h('span', { className: 'agent-bridge__mono' }, artifact.contentHash.slice(0, 12)), h('button', { className: 'agent-bridge__button', onClick: () => execution.setArtifactEnabled(artifact.id, !artifact.enabled) }, artifact.enabled ? copy.disable : 'Enable')]))) ))
     }
 
+    function renderProjects(h: any, copy: Copy, execution: any): unknown {
+      const snapshot = execution.projectSnapshot
+      return h('div', null,
+        h('div', { className: 'agent-bridge__section-head' },
+          h('div', null, h('h2', { className: 'agent-bridge__section-title' }, copy.projectsTab), h('p', { className: 'agent-bridge__section-copy' }, 'Canonical paths, Git repository identity, and DSH workspace associations.')),
+          h('button', { className: 'agent-bridge__button agent-bridge__button--primary', onClick: execution.discoverProjects }, 'Discover projects')),
+        execution.projectLinks.length ? h('div', null,
+          sectionHead(h, 'Confirmed links', '', `${execution.projectLinks.length}`),
+          table(h, [copy.source, copy.target, 'Confidence', copy.action], execution.projectLinks.map((link: any) => [endpointLabel(link.claudeRefs.length ? 'claude-code' : 'codex'), link.dshWorkspace?.title ?? '—', badge(h, link.confidence, toneFor(link.confidence)), h('button', { className: 'agent-bridge__button', onClick: () => execution.unlinkProject(link.id, link.revision) }, 'Unlink')])) , h('div', { style: { height: 28 } })) : null,
+        !snapshot ? emptyState(h, 'No project discovery snapshot', 'Discover projects to compare source roots with DSH workspaces.') : h('div', null,
+          sectionHead(h, 'Candidates', `${snapshot.projects.length} source references · ${snapshot.workspaces.length} DSH workspaces`, `${snapshot.candidates.length}`),
+          table(h, [copy.source, 'Project', copy.target, 'Confidence', copy.reason, copy.action], snapshot.candidates.map((candidate: any) => [
+            endpointLabel(candidate.project.endpointId), candidate.project.displayName, candidate.workspace?.title ?? '—', badge(h, candidate.confidence, toneFor(candidate.confidence)), candidate.reasons.join(', '),
+            candidate.workspace ? h('button', { className: 'agent-bridge__button', onClick: () => execution.confirmProjectLink(candidate.id) }, candidate.requiresConfirmation ? 'Confirm' : 'Link') : '—',
+          ]))))
+    }
+
     function renderActivity(h: any, copy: Copy, rows: any[], execution: any): unknown {
       return h('div', null,
         execution.runs.length ? h('div', null, sectionHead(h, 'Import runs', '', `${execution.runs.length}`), table(h, [copy.time, copy.state, copy.result, copy.action], execution.runs.map((run: any) => [formatTime(run.startedAt), badge(h, run.state, toneFor(run.state)), run.diagnostic ?? `${run.operationResults.length} operations`, h('button', { className: 'agent-bridge__button', disabled: run.state !== 'completed', onClick: () => execution.rollbackRun(run.id) }, copy.rollback)])), h('div', { style: { height: 28 } })) : null,
@@ -217,7 +251,7 @@ window.__ModuleLoader__.load({
     function summary(h: any, items: Array<[number, string]>): unknown { return h('div', { className: 'agent-bridge__summary' }, ...items.map(([value, label]) => h('div', { className: 'agent-bridge__metric', key: label }, h('span', { className: 'agent-bridge__metric-value' }, String(value)), h('span', { className: 'agent-bridge__metric-label' }, label)))) }
     function emptyState(h: any, title: string, hint: string): unknown { return h('div', { className: 'agent-bridge__empty' }, h('div', { className: 'agent-bridge__empty-inner' }, h('span', { className: 'agent-bridge__empty-title' }, title), hint ? h('span', null, hint) : null)) }
     function badge(h: any, label: string, tone: string): unknown { return h('span', { className: 'agent-bridge__badge', 'data-tone': tone }, label) }
-    function toneFor(value: string): string { if (['success', 'native', 'proposed', 'low'].includes(value)) return 'success'; if (['partial', 'adapted', 'conflict', 'medium', 'high'].includes(value)) return 'warn'; if (['error', 'blocked', 'forbidden'].includes(value)) return 'error'; return 'neutral' }
+    function toneFor(value: string): string { if (['success', 'native', 'proposed', 'low', 'exact', 'verified'].includes(value)) return 'success'; if (['partial', 'adapted', 'conflict', 'medium', 'high', 'strong', 'candidate'].includes(value)) return 'warn'; if (['error', 'blocked', 'forbidden'].includes(value)) return 'error'; return 'neutral' }
     function endpointLabel(value: string): string { return value === 'claude-code' ? 'Claude Code' : value === 'codex' ? 'Codex' : value === 'dsh' ? 'DSH' : value }
     function formatTime(value: string): string { try { return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value)) } catch { return value } }
 

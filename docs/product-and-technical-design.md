@@ -1,6 +1,6 @@
 # Agent Bridge 产品与技术方案
 
-- 状态：方案草案 v2；Phase 0–2 与 Phase 3A-1 环境管理已实现并完成本机运行验证
+- 状态：方案草案 v2；Phase 0–2、Phase 3A-1 环境管理与 Phase 3A-2 ProjectLink 已实现并完成本机运行验证
 - 日期：2026-11-06
 - 目标宿主：DeepSeek Harness（Cordis Host + Client 插件）
 - 产品名：Agent Bridge
@@ -710,6 +710,8 @@ Host 硬依赖候选：`storageDomain`、`subprocess`。可选依赖：`configEd
 ### Phase 3：扩大迁移面与只读历史
 
 Phase 3A-1 实现状态（2026-11-13）：已完成独立 Environments 页面，展示来源、artifact 明细、revision、verify 状态、last run 与启停状态；支持单 environment 重验、单 artifact 停用/恢复，并在 DSH 0.2.2-rc.2 冷启动后验证 storage materialization 与 preset 恢复。
+
+Phase 3A-2 实现状态（2026-11-20）：已完成 DSH Workspace 选择、canonical path/Git repository/worktree identity 探测、候选置信度与原因、用户确认/拆分、持久 ProjectLink，并验证关联 revision 变化会令旧 Import Plan 过期；Git remote 在进入 hash 前移除 userinfo/query/fragment，不读取凭证。
 
 后续范围：
 
