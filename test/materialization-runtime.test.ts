@@ -24,4 +24,12 @@ describe('MaterializationRuntime', () => {
     expect(await runtime.verify(record)).toBe(true)
     await runtime.dispose()
   })
+
+  it('rejects command materialization with inconsistent metadata', async () => {
+    const services = { agentPresets: { async register() { return async () => undefined }, async compositionInventory() { return [{ id: 'imported-claude-code', rows: [{ moduleName: '@local/agent-bridge/environment', enabled: true }] }] } } }
+    const runtime = new MaterializationRuntime({ get: (name: string) => (services as any)[name] } as any)
+    const command: MaterializationRecord = { ...record, artifactIdentity: { kind: 'command', scope: 'user', logicalName: 'review' }, targetKind: 'command-wrapper', command: { name: 'other', promptTemplate: 'Review' } }
+    await runtime.apply(command)
+    expect(await runtime.verify(command)).toBe(false)
+  })
 })

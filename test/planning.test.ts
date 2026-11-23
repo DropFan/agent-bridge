@@ -39,6 +39,24 @@ describe('Phase 1 import planning', () => {
     expect(plan.operations[0]).toMatchObject({ action: 'skip', state: 'conflict', reasons: ['first-import-target-collision'] })
   })
 
+  it('静态 prompt Command 进入 adapted command-wrapper 计划', () => {
+    const command = artifact({
+      identity: { kind: 'command', scope: 'user', logicalName: 'review' },
+      normalizedContent: 'Review $ARGUMENTS',
+      command: { name: 'review', argumentHint: '<path>', promptTemplate: 'Review $ARGUMENTS' },
+    })
+    const plan = generateImportPlan(snapshot([command]), target(), new Map(), { scanRevision: 3 })
+    expect(plan.operations[0]).toMatchObject({ state: 'proposed', targetKind: 'command-wrapper', risk: 'medium' })
+  })
+
+  it('同一环境中的同名 Commands 在计划阶段冲突', () => {
+    const first = artifact({ identity: { kind: 'command', scope: 'user', logicalName: 'review' }, normalizedContent: 'A', contentHash: 'a', command: { name: 'review', promptTemplate: 'A' } })
+    const second = artifact({ identity: { kind: 'command', scope: 'project', logicalName: 'review', projectKey: '/repo' }, normalizedContent: 'B', contentHash: 'b', command: { name: 'review', promptTemplate: 'B' } })
+    const plan = generateImportPlan(snapshot([first, second]), target(), new Map(), { scanRevision: 3 })
+    expect(plan.operations).toHaveLength(2)
+    expect(plan.operations.every((item) => item.state === 'conflict' && item.reasons.includes('duplicate-command-name'))).toBe(true)
+  })
+
   it('带脚本 Skill 在 Phase 1 被阻塞', () => {
     const skill = artifact({
       identity: { kind: 'skill', scope: 'user', logicalName: 'unsafe' },

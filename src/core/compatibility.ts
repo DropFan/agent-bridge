@@ -11,6 +11,17 @@ export function assessForDsh(artifact: PortableArtifact): CompatibilityAssessmen
     }
   }
 
+  if (artifact.identity.kind === 'command') {
+    if (!artifact.command) return {
+      level: 'blocked', risk: 'high', summary: 'Command 格式不受支持。', losses: [], blockers: ['unsupported-command-format'],
+    }
+    return {
+      level: 'adapted', targetKind: 'command-wrapper', risk: 'medium',
+      summary: '静态 prompt Command 可转换为 DSH scoped prompt wrapper。',
+      losses: ['命令结果由 DSH Agent 处理；来源端专属执行语义不会迁移。'], blockers: [], verifyMethod: 'inspect-effective-command-catalog',
+    }
+  }
+
   if (artifact.identity.kind === 'instruction') {
     return {
       level: 'native',

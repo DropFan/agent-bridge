@@ -62,6 +62,10 @@ export class MaterializationRuntime {
     if (!preset) return { valid: false, diagnostic: 'preset-missing' }
     if (preset.broken) return { valid: false, diagnostic: `preset-broken:${preset.broken}` }
     if (!preset.rows.some((row) => row.moduleName === '@local/agent-bridge/environment' && row.enabled === true)) return { valid: false, diagnostic: 'environment-plugin-missing' }
+    const commandRecords = enabled.filter((record) => record.targetKind === 'command-wrapper')
+    if (commandRecords.some((record) => !record.command || record.command.name !== record.artifactIdentity.logicalName)) {
+      return { valid: false, diagnostic: 'command-metadata-invalid' }
+    }
     return { valid: true }
   }
 
@@ -70,6 +74,7 @@ export class MaterializationRuntime {
     if (stored?.contentHash !== record.contentHash || stored.enabled !== record.enabled) return false
     const preset = (await this.agentPresets().compositionInventory()).find((item) => item.id === record.environmentId)
     if (!record.enabled) return preset === undefined
+    if (record.targetKind === 'command-wrapper' && (!record.command || record.command.name !== record.artifactIdentity.logicalName)) return false
     return preset !== undefined && preset.broken === undefined
       && preset.rows.some((row) => row.moduleName === '@local/agent-bridge/environment' && row.enabled === true)
   }

@@ -713,9 +713,10 @@ Phase 3A-1 实现状态（2026-11-13）：已完成独立 Environments 页面，
 
 Phase 3A-2 实现状态（2026-11-20）：已完成 DSH Workspace 选择、canonical path/Git repository/worktree identity 探测、候选置信度与原因、用户确认/拆分、持久 ProjectLink，并验证关联 revision 变化会令旧 Import Plan 过期；Git remote 在进入 hash 前移除 userinfo/query/fragment，不读取凭证。
 
+Phase 3B 实现状态（2026-11-23）：已完成 Claude Code `commands/*.md`、项目 `.claude/commands/*.md` 与 Codex 兼容旧格式 `prompts/*.md` 的静态 Prompt Command 发现和 DSH scoped command wrapper；只展开 `$ARGUMENTS`/`{{ input }}` 等文本占位符并通过 `agent.steer` 提交用户消息，不执行参数或来源代码。带 shell/exec/hook/allowed-tools/tool frontmatter、shell code fence、可执行位或敏感内容的文件均阻塞。
+
 后续范围：
 
-- Commands 的安全子集和 prompt wrapper；
 - Agent definitions → preset/prompt/tool policy 的受控映射；
 - 无秘密 MCP 定义和 Plugin 安装意图；
 - 外部项目与 DSH workspace 关联；

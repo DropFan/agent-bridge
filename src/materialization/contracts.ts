@@ -16,9 +16,10 @@ export interface MaterializationRecord {
   artifactIdentity: ArtifactIdentity
   sourceEndpointId: EndpointKind
   environmentId: string
-  targetKind: 'system-prompt' | 'skill-provider'
+  targetKind: 'system-prompt' | 'skill-provider' | 'command-wrapper'
   content: string
   contentHash: string
+  command?: { name: string; argumentHint?: string | undefined; promptTemplate: string } | undefined
   enabled: boolean
   createdAt: string
   updatedAt: string
@@ -81,8 +82,8 @@ export interface RollbackRunRequest {
 export interface EnvironmentArtifactView {
   id: string
   logicalName: string
-  kind: 'instruction' | 'skill'
-  targetKind: 'system-prompt' | 'skill-provider'
+  kind: 'instruction' | 'skill' | 'command'
+  targetKind: 'system-prompt' | 'skill-provider' | 'command-wrapper'
   sourceEndpointId: EndpointKind
   contentHash: string
   enabled: boolean
@@ -97,6 +98,7 @@ export interface EnvironmentView {
   artifactCount: number
   instructionCount: number
   skillCount: number
+  commandCount: number
   revision: string
   verifyState: 'verified' | 'degraded' | 'disabled'
   verifyDiagnostic?: string | undefined

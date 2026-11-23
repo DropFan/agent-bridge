@@ -8,6 +8,7 @@ export function claudeRoots(homeDir: string, projectDir?: string): DiscoveryRoot
     scope: 'user',
     instructionFiles: ['CLAUDE.md'],
     skillDirs: ['skills'],
+    commandDirs: ['commands'],
   }]
   if (projectDir) roots.push({
     endpointId: 'claude-code',
@@ -15,6 +16,7 @@ export function claudeRoots(homeDir: string, projectDir?: string): DiscoveryRoot
     scope: 'project',
     instructionFiles: ['CLAUDE.md'],
     skillDirs: ['.claude/skills'],
+    commandDirs: ['.claude/commands'],
     projectKey: projectDir,
   })
   return roots
@@ -28,6 +30,7 @@ export function codexRoots(homeDir: string, projectDir?: string): DiscoveryRoot[
       scope: 'user',
       instructionFiles: ['AGENTS.md'],
       skillDirs: ['skills'],
+      commandDirs: ['prompts'],
     },
     {
       endpointId: 'codex',
@@ -43,6 +46,7 @@ export function codexRoots(homeDir: string, projectDir?: string): DiscoveryRoot[
     scope: 'project',
     instructionFiles: ['AGENTS.md'],
     skillDirs: ['.agents/skills'],
+    commandDirs: ['.codex/prompts'],
     projectKey: projectDir,
   })
   return roots

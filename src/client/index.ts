@@ -33,18 +33,18 @@ window.__ModuleLoader__.load({
     const dictionaries = {
       en: {
         title: 'Agent Bridge', subtitle: 'Portable agent environments, reviewed before they enter DSH.', scan: 'Scan sources', scanning: 'Scanning…', plan: 'Generate plan', planning: 'Planning…', validate: 'Check freshness', execute: 'Execute approved changes', executing: 'Executing…', confirm: 'I reviewed this immutable plan and approve its proposed operations.', environments: 'Environments', disable: 'Disable', rollback: 'Rollback',
-        overview: 'Overview', import: 'Import plan', environmentsTab: 'Environments', projectsTab: 'Projects', activity: 'Activity', phase: 'Plan-only mode', detail: 'Reads source environments and stores reviewable plans. Nothing is applied to DSH.',
+        overview: 'Overview', import: 'Import plan', environmentsTab: 'Environments', projectsTab: 'Projects', activity: 'Activity', phase: 'Review before apply', detail: 'Scans are read-only. DSH changes require a fresh plan and explicit approval.',
         empty: 'No source snapshot', emptyHint: 'Scan Claude Code and Codex to build a migration inventory.', noPlan: 'No import plan', noPlanHint: 'Scan sources, then generate a plan to review every proposed change.',
-        source: 'Source', category: 'Category', target: 'Target', compatibility: 'Compatibility', result: 'Result', time: 'Time', state: 'State', action: 'Action', risk: 'Risk', reason: 'Reason',
-        endpoints: 'Endpoint health', endpointsHint: 'Availability and versions detected during the latest scan.', inventory: 'Migration inventory', inventoryHint: 'Portable items grouped by source and DSH target.', planTitle: 'Proposed operations', planHint: 'Nothing below will execute until a later phase adds an approved apply flow.', activityTitle: 'Recent activity', activityHint: 'Read-only scans and plan generation history.',
+        source: 'Source', category: 'Item', target: 'DSH target', compatibility: 'Support', result: 'Result', time: 'Time', state: 'Status', action: 'Action', risk: 'Risk', reason: 'Explanation',
+        endpoints: 'Endpoint health', endpointsHint: 'Availability and versions detected during the latest scan.', inventory: 'Migration inventory', inventoryHint: 'Portable items grouped by source and DSH target.', planTitle: 'Proposed operations', planHint: 'Review every change, conflict, and risk before explicitly approving execution.', activityTitle: 'Recent activity', activityHint: 'Scans, import runs, verification, and rollback history.',
         operations: 'Operations', blockers: 'Blockers', conflicts: 'Conflicts', proposed: 'Ready', digest: 'Plan', fresh: 'Fresh', expired: 'Expired', unavailable: 'Host Remote is unavailable. Verify that the DSH API Gateway composed this plugin.',
       },
       zh: {
         title: 'Agent Bridge', subtitle: '可移植的 Agent 环境，进入 DSH 前逐项审阅。', scan: '扫描来源', scanning: '扫描中…', plan: '生成计划', planning: '计划生成中…', validate: '检查新鲜度', execute: '执行已批准变更', executing: '执行中…', confirm: '我已审阅此不可变计划，并批准其中的拟议操作。', environments: '环境', disable: '停用', rollback: '回滚',
-        overview: '概览', import: '导入计划', environmentsTab: '环境', projectsTab: '项目', activity: '活动', phase: '仅计划模式', detail: '只读取来源环境并保存可审阅计划，不会向 DSH 应用任何内容。',
+        overview: '概览', import: '导入计划', environmentsTab: '环境', projectsTab: '项目', activity: '活动', phase: '审阅后应用', detail: '扫描保持只读；只有未过期的计划经明确批准后才会修改 DSH。',
         empty: '尚无来源快照', emptyHint: '扫描 Claude Code 与 Codex，建立迁移清单。', noPlan: '尚无导入计划', noPlanHint: '先扫描来源，再生成计划以逐项审阅变更。',
-        source: '来源', category: '类别', target: '目标', compatibility: '兼容性', result: '结果', time: '时间', state: '状态', action: '动作', risk: '风险', reason: '原因',
-        endpoints: '端点健康', endpointsHint: '最近一次扫描检测到的可用性与版本。', inventory: '迁移清单', inventoryHint: '按来源和 DSH 目标整理的可移植内容。', planTitle: '拟议操作', planHint: '后续阶段增加审批执行闭环前，以下内容均不会实际应用。', activityTitle: '近期活动', activityHint: '只读扫描与计划生成记录。',
+        source: '来源', category: '内容', target: 'DSH 目标', compatibility: '支持情况', result: '结果', time: '时间', state: '状态', action: '操作', risk: '风险', reason: '说明',
+        endpoints: '端点健康', endpointsHint: '最近一次扫描检测到的可用性与版本。', inventory: '迁移清单', inventoryHint: '按来源和 DSH 目标整理的可移植内容。', planTitle: '拟议操作', planHint: '执行前逐项审阅变更、冲突和风险，并明确批准。', activityTitle: '近期活动', activityHint: '扫描、导入、验证和回滚记录。',
         operations: '操作数', blockers: '阻塞', conflicts: '冲突', proposed: '待审阅', digest: '计划', fresh: '未过期', expired: '已过期', unavailable: 'Host Remote 不可用，请确认 DSH API Gateway 已组合本插件。',
       },
     }
@@ -130,7 +130,7 @@ window.__ModuleLoader__.load({
       return h('main', { className: 'agent-bridge', 'aria-labelledby': 'agent-bridge-title' },
         h('header', { className: 'agent-bridge__header' },
           h('div', { className: 'agent-bridge__identity' },
-            h('div', { className: 'agent-bridge__title-row' }, h('h1', { id: 'agent-bridge-title', className: 'agent-bridge__title' }, copy.title), h('span', { className: 'agent-bridge__version' }, 'Phase 1')),
+            h('div', { className: 'agent-bridge__title-row' }, h('h1', { id: 'agent-bridge-title', className: 'agent-bridge__title' }, copy.title), h('span', { className: 'agent-bridge__version' }, 'Phase 3B')),
             h('p', { className: 'agent-bridge__subtitle' }, copy.subtitle)),
           h('div', { className: 'agent-bridge__actions' },
             h('select', { className: 'agent-bridge__button', value: selectedWorkspaceId, onChange: (event: any) => { setSelectedWorkspaceId(event.target.value); setProjectSnapshot(undefined) }, 'aria-label': 'DSH Workspace' },
@@ -180,16 +180,16 @@ window.__ModuleLoader__.load({
         sectionHead(h, copy.endpoints, copy.endpointsHint, `${snapshot.endpoints.length}`),
         table(h, [copy.source, copy.result], snapshot.endpoints.map((item: any) => [
           h('span', { className: 'agent-bridge__source' }, endpointLabel(item.id)),
-          h('span', null, badge(h, item.state, toneFor(item.state)), item.version ? h('span', { className: 'agent-bridge__secondary' }, `  ${item.version}`) : null),
+          h('span', null, badge(h, displayValue(copy, item.state), toneFor(item.state)), item.version ? h('span', { className: 'agent-bridge__secondary' }, `  ${item.version}`) : null),
         ])),
         h('div', { style: { height: 28 } }),
         sectionHead(h, copy.inventory, copy.inventoryHint, `${snapshot.artifacts.length}`),
         summary(h, [[snapshot.artifacts.length, copy.operations], [portable, copy.proposed], [blocked, copy.blockers]]),
         table(h, [copy.source, copy.category, copy.target, copy.compatibility], snapshot.artifacts.map((item: any) => [
           h('span', { className: 'agent-bridge__source' }, endpointLabel(item.artifact.source.endpointId)),
-          item.artifact.identity.logicalName,
-          h('span', { className: 'agent-bridge__mono' }, item.compatibility.targetKind ?? '—'),
-          badge(h, item.compatibility.level, toneFor(item.compatibility.level)),
+          h('span', null, h('span', { className: 'agent-bridge__source' }, item.artifact.identity.logicalName), h('span', { className: 'agent-bridge__secondary' }, ` · ${displayValue(copy, item.artifact.identity.kind)}`)),
+          displayValue(copy, item.compatibility.targetKind ?? 'none'),
+          badge(h, displayValue(copy, item.compatibility.level), toneFor(item.compatibility.level)),
         ])))
     }
 
@@ -201,14 +201,14 @@ window.__ModuleLoader__.load({
         h('div', { className: 'agent-bridge__section-head' },
           h('div', null, h('h2', { className: 'agent-bridge__section-title' }, copy.planTitle), h('p', { className: 'agent-bridge__section-copy' }, copy.planHint)),
           h('div', { className: 'agent-bridge__plan-tools' },
-            validation ? h('span', { className: 'agent-bridge__freshness', 'data-valid': String(validation.valid), role: 'status' }, validation.valid ? copy.fresh : `${copy.expired} · ${validation.reasons.join(', ')}`) : null,
+            validation ? h('span', { className: 'agent-bridge__freshness', 'data-valid': String(validation.valid), role: 'status' }, validation.valid ? copy.fresh : `${copy.expired} · ${displayReasons(copy, validation.reasons)}`) : null,
             h('button', { className: 'agent-bridge__button', type: 'button', onClick: validatePlan }, copy.validate))),
         summary(h, [[plan.operations.length, copy.operations], [proposed, copy.proposed], [conflicts, copy.conflicts], [plan.blockers.length, copy.blockers]]),
         h('p', { className: 'agent-bridge__meta' }, `${copy.digest} ${plan.digest.slice(0, 12)} · ${formatTime(plan.createdAt)}`),
         h('label', { style: { display: 'flex', alignItems: 'center', gap: 8, margin: '14px 0', fontSize: 12 } }, h('input', { type: 'checkbox', checked: execution.confirmed, onChange: (event: any) => execution.setConfirmed(event.target.checked) }), copy.confirm),
         h('button', { className: 'agent-bridge__button agent-bridge__button--primary', type: 'button', disabled: !execution.confirmed || execution.executing || validation?.valid === false || !plan.operations.some((item: any) => item.state === 'proposed'), onClick: execution.executePlan }, execution.executing ? copy.executing : copy.execute),
         table(h, [copy.source, copy.category, copy.target, copy.state, copy.action, copy.risk, copy.reason], plan.operations.map((item: any) => [
-          endpointLabel(item.sourceEndpointId), item.artifactIdentity.logicalName, h('span', { className: 'agent-bridge__mono' }, item.targetEnvironmentId), badge(h, item.state, toneFor(item.state)), item.action, badge(h, item.risk, toneFor(item.risk)), h('span', { className: 'agent-bridge__secondary' }, item.reasons.join(', ') || '—'),
+          endpointLabel(item.sourceEndpointId), h('span', null, item.artifactIdentity.logicalName, h('span', { className: 'agent-bridge__secondary' }, ` · ${displayValue(copy, item.artifactIdentity.kind)}`)), displayEnvironment(item.targetEnvironmentId), badge(h, displayValue(copy, item.state), toneFor(item.state)), displayValue(copy, item.action), badge(h, displayValue(copy, item.risk), toneFor(item.risk)), h('span', { className: 'agent-bridge__secondary' }, displayReasons(copy, item.reasons)),
         ])))
     }
 
@@ -216,10 +216,10 @@ window.__ModuleLoader__.load({
       if (!execution.environments.length) return emptyState(h, copy.environments, copy.activityHint)
       return h('div', null, ...execution.environments.map((environment: any) => h('section', { key: environment.id, style: { marginBottom: 30 } },
         h('div', { className: 'agent-bridge__section-head' },
-          h('div', null, h('h2', { className: 'agent-bridge__section-title' }, environment.id), h('p', { className: 'agent-bridge__section-copy' }, `${endpointLabel(environment.sourceEndpointId)} · ${environment.revision.slice(0, 12)} · ${environment.artifactCount} artifacts`)),
-          h('div', { className: 'agent-bridge__plan-tools' }, badge(h, environment.verifyState, toneFor(environment.verifyState)), h('button', { className: 'agent-bridge__button', onClick: () => execution.verifyEnvironment(environment.id) }, copy.validate), h('button', { className: 'agent-bridge__button', disabled: !environment.enabled, onClick: () => execution.disableEnvironment(environment.id) }, copy.disable))),
+          h('div', null, h('h2', { className: 'agent-bridge__section-title' }, displayEnvironment(environment.id)), h('p', { className: 'agent-bridge__section-copy' }, `${endpointLabel(environment.sourceEndpointId)} · ${environment.artifactCount} ${displayValue(copy, 'artifacts')} · ${environment.revision.slice(0, 12)}`)),
+          h('div', { className: 'agent-bridge__plan-tools' }, badge(h, displayValue(copy, environment.verifyState), toneFor(environment.verifyState)), h('button', { className: 'agent-bridge__button', onClick: () => execution.verifyEnvironment(environment.id) }, copy.validate), h('button', { className: 'agent-bridge__button', disabled: !environment.enabled, onClick: () => execution.disableEnvironment(environment.id) }, copy.disable))),
         environment.verifiedAt ? h('p', { className: 'agent-bridge__meta' }, `${formatTime(environment.verifiedAt)}${environment.verifyDiagnostic ? ` · ${environment.verifyDiagnostic}` : ''}`) : null,
-        table(h, [copy.category, copy.source, copy.state, copy.digest, copy.action], environment.artifacts.map((artifact: any) => [artifact.logicalName, endpointLabel(artifact.sourceEndpointId), badge(h, artifact.enabled ? 'enabled' : 'disabled', artifact.enabled ? 'success' : 'neutral'), h('span', { className: 'agent-bridge__mono' }, artifact.contentHash.slice(0, 12)), h('button', { className: 'agent-bridge__button', onClick: () => execution.setArtifactEnabled(artifact.id, !artifact.enabled) }, artifact.enabled ? copy.disable : 'Enable')]))) ))
+        table(h, [copy.category, copy.source, copy.state, copy.digest, copy.action], environment.artifacts.map((artifact: any) => [h('span', null, artifact.logicalName, h('span', { className: 'agent-bridge__secondary' }, ` · ${displayValue(copy, artifact.kind)}`)), endpointLabel(artifact.sourceEndpointId), badge(h, displayValue(copy, artifact.enabled ? 'enabled' : 'disabled'), artifact.enabled ? 'success' : 'neutral'), h('span', { className: 'agent-bridge__mono' }, artifact.contentHash.slice(0, 12)), h('button', { className: 'agent-bridge__button', onClick: () => execution.setArtifactEnabled(artifact.id, !artifact.enabled) }, artifact.enabled ? copy.disable : 'Enable')]))) ))
     }
 
     function renderProjects(h: any, copy: Copy, execution: any): unknown {
@@ -230,19 +230,19 @@ window.__ModuleLoader__.load({
           h('button', { className: 'agent-bridge__button agent-bridge__button--primary', onClick: execution.discoverProjects }, 'Discover projects')),
         execution.projectLinks.length ? h('div', null,
           sectionHead(h, 'Confirmed links', '', `${execution.projectLinks.length}`),
-          table(h, [copy.source, copy.target, 'Confidence', copy.action], execution.projectLinks.map((link: any) => [endpointLabel(link.claudeRefs.length ? 'claude-code' : 'codex'), link.dshWorkspace?.title ?? '—', badge(h, link.confidence, toneFor(link.confidence)), h('button', { className: 'agent-bridge__button', onClick: () => execution.unlinkProject(link.id, link.revision) }, 'Unlink')])) , h('div', { style: { height: 28 } })) : null,
+          table(h, [copy.source, copy.target, 'Confidence', copy.action], execution.projectLinks.map((link: any) => [endpointLabel(link.claudeRefs.length ? 'claude-code' : 'codex'), link.dshWorkspace?.title ?? '—', badge(h, displayValue(copy, link.confidence), toneFor(link.confidence)), h('button', { className: 'agent-bridge__button', onClick: () => execution.unlinkProject(link.id, link.revision) }, 'Unlink')])) , h('div', { style: { height: 28 } })) : null,
         !snapshot ? emptyState(h, 'No project discovery snapshot', 'Discover projects to compare source roots with DSH workspaces.') : h('div', null,
           sectionHead(h, 'Candidates', `${snapshot.projects.length} source references · ${snapshot.workspaces.length} DSH workspaces`, `${snapshot.candidates.length}`),
           table(h, [copy.source, 'Project', copy.target, 'Confidence', copy.reason, copy.action], snapshot.candidates.map((candidate: any) => [
-            endpointLabel(candidate.project.endpointId), candidate.project.displayName, candidate.workspace?.title ?? '—', badge(h, candidate.confidence, toneFor(candidate.confidence)), candidate.reasons.join(', '),
+            endpointLabel(candidate.project.endpointId), candidate.project.displayName, candidate.workspace?.title ?? '—', badge(h, displayValue(copy, candidate.confidence), toneFor(candidate.confidence)), displayReasons(copy, candidate.reasons),
             candidate.workspace ? h('button', { className: 'agent-bridge__button', onClick: () => execution.confirmProjectLink(candidate.id) }, candidate.requiresConfirmation ? 'Confirm' : 'Link') : '—',
           ]))))
     }
 
     function renderActivity(h: any, copy: Copy, rows: any[], execution: any): unknown {
       return h('div', null,
-        execution.runs.length ? h('div', null, sectionHead(h, 'Import runs', '', `${execution.runs.length}`), table(h, [copy.time, copy.state, copy.result, copy.action], execution.runs.map((run: any) => [formatTime(run.startedAt), badge(h, run.state, toneFor(run.state)), run.diagnostic ?? `${run.operationResults.length} operations`, h('button', { className: 'agent-bridge__button', disabled: run.state !== 'completed', onClick: () => execution.rollbackRun(run.id) }, copy.rollback)])), h('div', { style: { height: 28 } })) : null,
-        rows.length ? h('div', null, sectionHead(h, copy.activityTitle, copy.activityHint, `${rows.length}`), table(h, [copy.time, copy.result], rows.map((row: any) => [formatTime(row.startedAt), h('span', null, badge(h, row.state, toneFor(row.state)), ` ${row.summary}`)]))) : emptyState(h, copy.activityTitle, copy.activityHint))
+        execution.runs.length ? h('div', null, sectionHead(h, 'Import runs', '', `${execution.runs.length}`), table(h, [copy.time, copy.state, copy.result, copy.action], execution.runs.map((run: any) => [formatTime(run.startedAt), badge(h, displayValue(copy, run.state), toneFor(run.state)), run.diagnostic ?? `${run.operationResults.length} operations`, h('button', { className: 'agent-bridge__button', disabled: run.state !== 'completed', onClick: () => execution.rollbackRun(run.id) }, copy.rollback)])), h('div', { style: { height: 28 } })) : null,
+        rows.length ? h('div', null, sectionHead(h, copy.activityTitle, copy.activityHint, `${rows.length}`), table(h, [copy.time, copy.result], rows.map((row: any) => [formatTime(row.startedAt), h('span', null, badge(h, displayValue(copy, row.state), toneFor(row.state)), ` ${row.summary}`)]))) : emptyState(h, copy.activityTitle, copy.activityHint))
     }
 
     function sectionHead(h: any, title: string, description: string, meta?: string): unknown {
@@ -253,6 +253,50 @@ window.__ModuleLoader__.load({
     function badge(h: any, label: string, tone: string): unknown { return h('span', { className: 'agent-bridge__badge', 'data-tone': tone }, label) }
     function toneFor(value: string): string { if (['success', 'native', 'proposed', 'low', 'exact', 'verified'].includes(value)) return 'success'; if (['partial', 'adapted', 'conflict', 'medium', 'high', 'strong', 'candidate'].includes(value)) return 'warn'; if (['error', 'blocked', 'forbidden'].includes(value)) return 'error'; return 'neutral' }
     function endpointLabel(value: string): string { return value === 'claude-code' ? 'Claude Code' : value === 'codex' ? 'Codex' : value === 'dsh' ? 'DSH' : value }
+    function displayEnvironment(value: string): string { return value === 'imported-claude-code' ? 'Claude Code 环境' : value === 'imported-codex' ? 'Codex 环境' : value }
+    function displayValue(copy: Copy, value: string): string {
+      const zh = copy.overview === '概览'
+      const map: Record<string, [string, string]> = {
+        available: ['Available', '可用'], missing: ['Not installed', '未安装'], unsupported: ['Unsupported', '不支持'], error: ['Error', '错误'], success: ['Completed', '已完成'], partial: ['Partial', '部分完成'],
+        completed: ['Completed', '已完成'], failed: ['Failed', '失败'], interrupted: ['Interrupted', '已中断'], 'rolled-back': ['Rolled back', '已回滚'], 'rollback-failed': ['Rollback failed', '回滚失败'],
+        instruction: ['Instruction', '项目指令'], skill: ['Skill', '技能'], command: ['Prompt command', '提示命令'],
+        'system-prompt': ['System prompt', '系统提示词'], 'skill-provider': ['Skill provider', '技能提供方'], 'command-wrapper': ['Prompt command', '提示命令'], none: ['No target', '无目标'],
+        native: ['Native', '原生支持'], adapted: ['Adapted', '需转换'], blocked: ['Blocked', '已阻塞'], 'archive-only': ['Archive only', '仅归档'],
+        proposed: ['Ready to import', '可导入'], unchanged: ['No changes', '无变化'], conflict: ['Needs resolution', '需解决冲突'], skipped: ['Skipped', '已跳过'],
+        register: ['Create', '新建'], update: ['Update', '更新'], skip: ['Skip', '跳过'],
+        low: ['Low', '低风险'], medium: ['Medium', '中风险'], high: ['High', '高风险'], forbidden: ['Forbidden', '禁止'],
+        exact: ['Exact match', '精确匹配'], strong: ['Strong match', '高置信匹配'], candidate: ['Candidate', '候选'], none_match: ['No match', '无匹配'],
+        verified: ['Verified', '验证通过'], degraded: ['Needs attention', '需要处理'],
+        enabled: ['Enabled', '已启用'], disabled: ['Disabled', '已停用'], artifacts: ['artifacts', '项内容'],
+      }
+      return (map[value] ?? [value, value])[zh ? 1 : 0]
+    }
+    function displayReasons(copy: Copy, reasons: string[]): string {
+      if (!reasons.length) return '—'
+      const zh = copy.overview === '概览'
+      const map: Record<string, [string, string]> = {
+        'first-import-target-collision': ['A target with the same identity already exists', '目标中已存在同名内容'],
+        'source-and-target-unchanged': ['Source and DSH are unchanged', '来源与 DSH 均无变化'],
+        'target-changed-after-baseline': ['DSH changed after the last import', 'DSH 在上次导入后已变化'],
+        'source-and-target-diverged': ['Source and DSH changed differently', '来源与 DSH 已分别变化'],
+        'scripted-skill-outside-phase-one': ['Scripts require separate review', '包含脚本，需单独审批'],
+        'unsafe-or-unsupported-command': ['Command contains executable or unsupported behavior', '命令含执行逻辑或不受支持的行为'],
+        'duplicate-command-name': ['Multiple source commands would register the same name', '多个来源命令会注册同一个名称，请先消歧'],
+        'target-observation-incomplete': ['DSH target state is incomplete', 'DSH 目标状态不完整'],
+        'canonical-path-match': ['Canonical paths are identical', '规范路径完全一致'],
+        'repository-root-match': ['Same Git repository or worktree family', '属于同一 Git 仓库或 worktree'],
+        'git-identity-match': ['Git remotes identify the same repository', 'Git 远端标识为同一仓库'],
+        'basename-match': ['Directory names match', '目录名称相同'],
+        'ambiguous-equal-score': ['Multiple workspaces match equally', '多个 Workspace 匹配度相同'],
+        'no-workspace-match': ['No matching DSH workspace', '未找到匹配的 DSH Workspace'],
+        'project-link-revision-changed': ['Project association changed', '项目关联已变化'],
+        'scan-revision-changed': ['A newer source scan exists', '已有更新的来源扫描'],
+        'source-changed': ['Source content changed after planning', '来源内容在计划生成后已变化'],
+        'target-revision-changed': ['DSH target changed after planning', 'DSH 目标在计划生成后已变化'],
+        'plan-not-found': ['The saved plan is unavailable', '已保存的计划不可用'],
+      }
+      return reasons.map((reason) => (map[reason] ?? [reason, reason])[zh ? 1 : 0]).join('；')
+    }
     function formatTime(value: string): string { try { return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value)) } catch { return value } }
 
     function table(h: any, headers: string[], rows: unknown[][]): unknown {

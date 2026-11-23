@@ -26,7 +26,7 @@ const resourceSchema = z.object({
 const artifactSchema = z.object({
   artifact: z.object({
     identity: z.object({
-      kind: z.enum(['instruction', 'skill']),
+      kind: z.enum(['instruction', 'skill', 'command']),
       scope: z.enum(['user', 'project']),
       logicalName: z.string(),
       projectKey: z.string().optional(),
@@ -42,10 +42,11 @@ const artifactSchema = z.object({
     contentHash: z.string(),
     sensitivity: z.enum(['public', 'unknown', 'sensitive']),
     resources: z.array(resourceSchema),
+    command: z.object({ name: z.string(), argumentHint: z.string().optional(), promptTemplate: z.string() }).optional(),
   }),
   compatibility: z.object({
     level: z.enum(['native', 'adapted', 'archive-only', 'blocked']),
-    targetKind: z.enum(['system-prompt', 'skill-provider']).optional(),
+    targetKind: z.enum(['system-prompt', 'skill-provider', 'command-wrapper']).optional(),
     risk: z.enum(['low', 'medium', 'high', 'forbidden']),
     summary: z.string(),
     losses: z.array(z.string()),
@@ -86,8 +87,8 @@ const importPlanSchema: z.ZodType<ImportPlan> = z.object({
   id: z.string(), createdAt: z.string(), scanId: z.string(), scanRevision: z.number().int(), projectLinkRevision: z.number().int(), targetRevision: z.string(),
   sourceEndpointIds: z.array(z.enum(['claude-code', 'codex', 'dsh'])), targetEnvironmentIds: z.array(z.string()),
   operations: z.array(z.object({
-    id: z.string(), artifactKey: z.string(), artifactIdentity: z.object({ kind: z.enum(['instruction', 'skill']), scope: z.enum(['user', 'project']), logicalName: z.string(), projectKey: z.string().optional() }),
-    sourceEndpointId: z.enum(['claude-code', 'codex', 'dsh']), targetEnvironmentId: z.string(), targetKind: z.enum(['system-prompt', 'skill-provider']).optional(),
+    id: z.string(), artifactKey: z.string(), artifactIdentity: z.object({ kind: z.enum(['instruction', 'skill', 'command']), scope: z.enum(['user', 'project']), logicalName: z.string(), projectKey: z.string().optional() }),
+    sourceEndpointId: z.enum(['claude-code', 'codex', 'dsh']), targetEnvironmentId: z.string(), targetKind: z.enum(['system-prompt', 'skill-provider', 'command-wrapper']).optional(),
     action: z.enum(['register', 'update', 'skip']), state: z.enum(['proposed', 'unchanged', 'conflict', 'blocked', 'skipped']),
     expectedSourceHash: z.string(), expectedTargetRevision: z.string(), beforeHash: z.string().optional(), afterHash: z.string(),
     risk: z.enum(['low', 'medium', 'high', 'forbidden']), compatibility: artifactSchema.shape.compatibility,
@@ -96,9 +97,9 @@ const importPlanSchema: z.ZodType<ImportPlan> = z.object({
 })
 
 const materializationSchema: z.ZodType<MaterializationRecord> = z.object({
-  id: z.string(), artifactKey: z.string(), artifactIdentity: z.object({ kind: z.enum(['instruction', 'skill']), scope: z.enum(['user', 'project']), logicalName: z.string(), projectKey: z.string().optional() }),
-  sourceEndpointId: z.enum(['claude-code', 'codex', 'dsh']), environmentId: z.string(), targetKind: z.enum(['system-prompt', 'skill-provider']),
-  content: z.string(), contentHash: z.string(), enabled: z.boolean(), createdAt: z.string(), updatedAt: z.string(), runId: z.string(),
+  id: z.string(), artifactKey: z.string(), artifactIdentity: z.object({ kind: z.enum(['instruction', 'skill', 'command']), scope: z.enum(['user', 'project']), logicalName: z.string(), projectKey: z.string().optional() }),
+  sourceEndpointId: z.enum(['claude-code', 'codex', 'dsh']), environmentId: z.string(), targetKind: z.enum(['system-prompt', 'skill-provider', 'command-wrapper']),
+  content: z.string(), contentHash: z.string(), command: z.object({ name: z.string(), argumentHint: z.string().optional(), promptTemplate: z.string() }).optional(), enabled: z.boolean(), createdAt: z.string(), updatedAt: z.string(), runId: z.string(),
 })
 const runSchema: z.ZodType<ImportRun> = z.object({
   id: z.string(), planId: z.string(), planDigest: z.string(), fence: z.number().int(), state: z.enum(['validating','materializing','verifying','completed','failed','rolled-back','rollback-failed','interrupted']),

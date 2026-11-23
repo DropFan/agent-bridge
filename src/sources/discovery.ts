@@ -24,6 +24,7 @@ export interface DiscoveryRoot {
   scope: ArtifactScope
   instructionFiles: string[]
   skillDirs: string[]
+  commandDirs?: string[]
   projectKey?: string
 }
 
@@ -38,6 +39,11 @@ export async function discoverRoots(roots: DiscoveryRoot[], signal?: AbortSignal
       const result = await readInstruction(root, candidate)
       if (result.artifact) artifacts.push(result.artifact)
       if (result.warning) warnings.push(result.warning)
+    }
+    for (const commandDir of root.commandDirs ?? []) {
+      const result = await readCommands(root, path.join(root.root, commandDir), signal)
+      artifacts.push(...result.artifacts)
+      warnings.push(...result.warnings)
     }
     for (const skillDir of root.skillDirs) {
       const result = await readSkills(root, path.join(root.root, skillDir), signal)
@@ -85,6 +91,66 @@ async function readInstruction(root: DiscoveryRoot, candidate: string): Promise<
     if (code === 'ENOENT' || errorCode(error) === 'ENOENT') return {}
     return { warning: warning(root.endpointId, candidate, code, '无法安全读取指令文件，已跳过。') }
   }
+}
+
+async function readCommands(root: DiscoveryRoot, commandRoot: string, signal?: AbortSignal): Promise<DiscoveryResult> {
+  const artifacts: PortableArtifact[] = []
+  const warnings: ScanWarning[] = []
+  let entries
+  try {
+    const resolvedRoot = await assertContainedDirectory(root.root, commandRoot)
+    entries = await readdir(resolvedRoot, { withFileTypes: true })
+    commandRoot = resolvedRoot
+  } catch (error) {
+    if (errorCode(error) === 'ENOENT') return { artifacts, warnings }
+    return { artifacts, warnings: [warning(root.endpointId, commandRoot, 'command-root-unreadable', 'Commands 根目录不可读。')] }
+  }
+
+  for (const entry of entries) {
+    signal?.throwIfAborted()
+    if (!entry.isFile() || !entry.name.endsWith('.md')) continue
+    const commandFile = path.join(commandRoot, entry.name)
+    try {
+      const safe = await assertSafeRegularFile(commandRoot, commandFile, MAX_INSTRUCTION_BYTES)
+      if (safe.executable) {
+        warnings.push(warning(root.endpointId, commandFile, 'executable-command-blocked', '可执行 Command 文件已阻塞。'))
+        continue
+      }
+      const raw = await readFile(safe.realPath, 'utf8')
+      if (containsLikelySecret(raw)) {
+        warnings.push(warning(root.endpointId, commandFile, 'sensitive-content', 'Command 疑似包含秘密，已跳过。'))
+        continue
+      }
+      const normalized = normalizeMarkdown(raw)
+      const command = parseStaticCommand(normalized.content, path.basename(entry.name, '.md'))
+      if (!command) {
+        warnings.push(warning(root.endpointId, commandFile, 'unsafe-command-semantics', 'Command 含执行语义或格式不受支持，已阻塞。'))
+        continue
+      }
+      artifacts.push({
+        identity: { kind: 'command', scope: root.scope, logicalName: command.name, ...(root.projectKey ? { projectKey: root.projectKey } : {}) },
+        source: { endpointId: root.endpointId, nativeRef: commandFile, observedRevision: normalized.contentHash },
+        title: command.name, description: command.description, normalizedContent: command.promptTemplate,
+        contentHash: normalized.contentHash, sensitivity: 'public', resources: [],
+        command: { name: command.name, argumentHint: command.argumentHint, promptTemplate: command.promptTemplate },
+      })
+    } catch (error) {
+      warnings.push(warning(root.endpointId, commandFile, error instanceof Error ? error.message : 'command-read-failed', 'Command 无法安全读取，已跳过。'))
+    }
+  }
+  return { artifacts, warnings }
+}
+
+function parseStaticCommand(content: string, fallbackName: string): { name: string; description: string; argumentHint?: string; promptTemplate: string } | undefined {
+  const metadata = parseFrontmatter(content)
+  const body = metadata.body.trim()
+  const name = (metadata.values.get('name') ?? fallbackName).trim().toLowerCase()
+  if (!/^[a-z][a-z0-9_-]*$/u.test(name) || !body) return undefined
+  if (/\b(?:bash|shell|command|exec|hook|allowed-tools|tool)\s*:/iu.test(metadata.frontmatter)) return undefined
+  if (/^#!|```(?:sh|bash|zsh|fish|powershell|cmd)\b/imu.test(body)) return undefined
+  const description = metadata.values.get('description')?.trim() || `Imported prompt command ${name}`
+  const argumentHint = metadata.values.get('argument-hint')?.trim() || metadata.values.get('argumentHint')?.trim()
+  return { name, description, ...(argumentHint ? { argumentHint } : {}), promptTemplate: body }
 }
 
 async function readSkills(root: DiscoveryRoot, skillRoot: string, signal?: AbortSignal): Promise<DiscoveryResult> {
@@ -218,17 +284,22 @@ async function walkResourceDirectory(
 }
 
 function parseSkillMetadata(content: string, fallbackName: string): { name: string; description?: string } {
-  if (!content.startsWith('---\n')) return { name: fallbackName }
+  const { values } = parseFrontmatter(content)
+  const description = values.get('description')
+  return { name: values.get('name') || fallbackName, ...(description ? { description } : {}) }
+}
+
+function parseFrontmatter(content: string): { values: Map<string, string>; frontmatter: string; body: string } {
+  if (!content.startsWith('---\n')) return { values: new Map(), frontmatter: '', body: content }
   const end = content.indexOf('\n---\n', 4)
-  if (end < 0) return { name: fallbackName }
+  if (end < 0) return { values: new Map(), frontmatter: '', body: content }
   const frontmatter = content.slice(4, end)
   const values = new Map<string, string>()
   for (const line of frontmatter.split('\n')) {
     const match = /^([a-zA-Z][\w-]*):\s*["']?(.*?)["']?\s*$/u.exec(line)
     if (match?.[1] && match[2] !== undefined) values.set(match[1], match[2])
   }
-  const description = values.get('description')
-  return { name: values.get('name') || fallbackName, ...(description ? { description } : {}) }
+  return { values, frontmatter, body: content.slice(end + 5) }
 }
 
 async function assertContainedDirectory(root: string, candidate: string): Promise<string> {

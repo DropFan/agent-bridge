@@ -16,7 +16,7 @@ export type PlanOperationAction = 'register' | 'update' | 'skip'
 
 export interface TargetArtifactObservation {
   key: string
-  kind: 'instruction' | 'skill' | 'environment'
+  kind: 'instruction' | 'skill' | 'command' | 'environment'
   logicalName: string
   contentHash?: string | undefined
   ownership: 'bridge-managed' | 'external'
@@ -46,7 +46,7 @@ export interface ImportPlanOperation {
   artifactIdentity: ArtifactIdentity
   sourceEndpointId: EndpointKind
   targetEnvironmentId: string
-  targetKind?: 'system-prompt' | 'skill-provider' | undefined
+  targetKind?: 'system-prompt' | 'skill-provider' | 'command-wrapper' | undefined
   action: PlanOperationAction
   state: PlanOperationState
   expectedSourceHash: string

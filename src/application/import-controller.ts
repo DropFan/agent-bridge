@@ -61,6 +61,7 @@ export class ImportController {
         signal?.throwIfAborted()
         const assessed = snapshot.artifacts.find(({ artifact }) => planArtifactKey(artifact.source.endpointId, artifact.identity) === operation.artifactKey)
         if (!assessed?.artifact.normalizedContent || !operation.targetKind) throw new Error(`artifact-content-unavailable:${operation.artifactKey}`)
+        if (operation.targetKind === 'command-wrapper' && !assessed.artifact.command) throw new Error(`command-metadata-unavailable:${operation.artifactKey}`)
         const id = `materialization:${operation.artifactKey}`
         const existing = before.get(id)
         if (existing && existing.contentHash !== operation.beforeHash && operation.action === 'update') throw new Error(`target-changed:${operation.artifactKey}`)
@@ -69,7 +70,7 @@ export class ImportController {
           id, artifactKey: operation.artifactKey, artifactIdentity: operation.artifactIdentity,
           sourceEndpointId: operation.sourceEndpointId, environmentId: operation.targetEnvironmentId,
           targetKind: operation.targetKind, content: assessed.artifact.normalizedContent,
-          contentHash: operation.afterHash, enabled: true, createdAt: existing?.createdAt ?? now, updatedAt: now, runId,
+          contentHash: operation.afterHash, command: assessed.artifact.command, enabled: true, createdAt: existing?.createdAt ?? now, updatedAt: now, runId,
         }
         await this.runtime.apply(record)
         await this.repository.putMaterialization(record)
@@ -148,6 +149,7 @@ export class ImportController {
         id, sourceEndpointId: records[0]!.sourceEndpointId, enabled, artifactCount: records.length,
         instructionCount: records.filter((item) => item.targetKind === 'system-prompt').length,
         skillCount: records.filter((item) => item.targetKind === 'skill-provider').length,
+        commandCount: records.filter((item) => item.targetKind === 'command-wrapper').length,
         revision: sha256(JSON.stringify(records.map((item) => [item.id, item.contentHash, item.enabled]).sort())),
         verifyState: enabled ? 'verified' : 'disabled',
         lastRunId: sorted[0]?.runId,

@@ -64,6 +64,19 @@ describe('ImportController', () => {
     expect(controller.environments()[0]).toMatchObject({ id: 'imported-claude-code', enabled: true, instructionCount: 1 })
   })
 
+  it('Command materialization 保留静态模板元数据并计入环境', async () => {
+    const { repository, scan, plan } = fixture()
+    scan.artifacts = [{ artifact: { identity: { kind: 'command', scope: 'user', logicalName: 'review' }, source: { endpointId: 'claude-code', nativeRef: '/safe/review.md', observedRevision: 'x' }, title: 'review', normalizedContent: 'Review $ARGUMENTS', contentHash: 'hash', sensitivity: 'public', resources: [], command: { name: 'review', argumentHint: '<path>', promptTemplate: 'Review $ARGUMENTS' } }, compatibility: { level: 'adapted', targetKind: 'command-wrapper', risk: 'medium', summary: '', losses: [], blockers: [] } }]
+    plan.operations = [{ ...plan.operations[0]!, artifactKey: 'claude-code:command:user::review', artifactIdentity: { kind: 'command', scope: 'user', logicalName: 'review' }, targetKind: 'command-wrapper', compatibility: { level: 'adapted', targetKind: 'command-wrapper', risk: 'medium', summary: '', losses: [], blockers: [] } }]
+    await repository.saveSnapshot(scan, { id: 'scan', type: 'scan', state: 'success', startedAt: '', summary: '' })
+    await repository.saveImportPlan(plan)
+    const runtime = new FakeRuntime()
+    const controller = new ImportController(repository, runtime as any, { observe: async () => ({ revision: 'target', observedAt: '', artifacts: [], complete: true, warnings: [] }) })
+    await controller.execute({ planId: 'plan', planDigest: 'digest', confirmed: true })
+    expect(repository.listMaterializations()[0]?.command).toEqual({ name: 'review', argumentHint: '<path>', promptTemplate: 'Review $ARGUMENTS' })
+    expect(controller.environments()[0]).toMatchObject({ commandCount: 1 })
+  })
+
   it('并发执行仅一个获得 lease', async () => {
     const { repository, scan, plan } = fixture()
     await repository.saveSnapshot(scan, { id: 'scan', type: 'scan', state: 'success', startedAt: '', summary: '' })

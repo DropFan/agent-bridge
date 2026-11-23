@@ -21,9 +21,9 @@ export function generateImportPlan(
 ): ImportPlan {
   if (request.scanRevision !== snapshot.revision) throw new Error('scan-revision-changed')
   const selected = new Set<EndpointKind>(request.sourceEndpointIds ?? ['claude-code', 'codex'])
-  const operations = snapshot.artifacts
+  const operations = blockDuplicateCommandNames(snapshot.artifacts
     .filter(({ artifact }) => selected.has(artifact.source.endpointId))
-    .map((entry) => compareArtifact(entry, target, baselines))
+    .map((entry) => compareArtifact(entry, target, baselines)))
     .sort((left, right) => left.artifactKey.localeCompare(right.artifactKey))
 
   const planBase = {
@@ -40,6 +40,20 @@ export function generateImportPlan(
     blockers: operations.filter((operation) => operation.state === 'blocked').map((operation) => operation.artifactKey),
   }
   return { ...planBase, digest: sha256(JSON.stringify(planBase)) }
+}
+
+function blockDuplicateCommandNames(operations: ImportPlanOperation[]): ImportPlanOperation[] {
+  const counts = new Map<string, number>()
+  for (const operation of operations) {
+    if (operation.artifactIdentity.kind !== 'command') continue
+    const key = `${operation.targetEnvironmentId}:${operation.artifactIdentity.logicalName}`
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  return operations.map((operation) => {
+    const key = `${operation.targetEnvironmentId}:${operation.artifactIdentity.logicalName}`
+    if (operation.artifactIdentity.kind !== 'command' || (counts.get(key) ?? 0) < 2) return operation
+    return { ...operation, state: 'conflict', action: 'skip', approvalRequired: false, reasons: [...new Set([...operation.reasons, 'duplicate-command-name'])] }
+  })
 }
 
 export function planArtifactKey(endpointId: EndpointKind, identity: import('../shared/contracts.js').ArtifactIdentity): string {
@@ -68,6 +82,10 @@ function compareArtifact(
     state = 'blocked'
     action = 'skip'
     reasons.push(...compatibility.blockers)
+  } else if (artifact.identity.kind === 'command' && !artifact.command) {
+    state = 'blocked'
+    action = 'skip'
+    reasons.push('unsafe-or-unsupported-command')
   } else if (artifact.identity.kind === 'skill' && hasScripts) {
     state = 'blocked'
     action = 'skip'

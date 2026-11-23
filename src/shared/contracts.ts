@@ -1,5 +1,5 @@
 export type EndpointKind = 'claude-code' | 'codex' | 'dsh'
-export type ArtifactKind = 'instruction' | 'skill'
+export type ArtifactKind = 'instruction' | 'skill' | 'command'
 export type ArtifactScope = 'user' | 'project'
 export type CompatibilityLevel = 'native' | 'adapted' | 'archive-only' | 'blocked'
 export type RiskLevel = 'low' | 'medium' | 'high' | 'forbidden'
@@ -34,11 +34,16 @@ export interface PortableArtifact {
   contentHash: string
   sensitivity: 'public' | 'unknown' | 'sensitive'
   resources: StaticResource[]
+  command?: {
+    name: string
+    argumentHint?: string | undefined
+    promptTemplate: string
+  } | undefined
 }
 
 export interface CompatibilityAssessment {
   level: CompatibilityLevel
-  targetKind?: 'system-prompt' | 'skill-provider' | undefined
+  targetKind?: 'system-prompt' | 'skill-provider' | 'command-wrapper' | undefined
   risk: RiskLevel
   summary: string
   losses: string[]

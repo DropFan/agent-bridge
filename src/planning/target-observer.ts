@@ -54,6 +54,7 @@ export async function observeDshTarget(
         key: `${preset.id}:environment:user::${encodeURIComponent(preset.id)}`,
         kind: 'environment',
         logicalName: preset.id,
+        contentHash: sha256(JSON.stringify({ broken: preset.broken, rows: preset.rows })),
         ownership: preset.rows.some((row) => row.moduleName === '@local/agent-bridge') ? 'bridge-managed' : 'external',
       })
       if (preset.broken) warnings.push(`preset-broken:${preset.id}`)

@@ -60,22 +60,23 @@
   },
   "engines": {
     "node": ">=24",
-    "dsh": "0.2.2-rc.5"
+    "dsh": "0.2.3-alpha.2"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.1.0",
-    "@deepseek-ai/dsh-storage-domain": "0.2.2-rc.5",
-    "@deepseek-ai/dsh-typert-protocol": "0.2.2-rc.5"
+    "@deepseek-ai/dsh-storage-domain": "0.2.3-alpha.2",
+    "@deepseek-ai/dsh-typert-protocol": "0.2.3-alpha.2"
   },
   "dependencies": {
     "zod": "4.6.6"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "~4.1.0",
-    "@deepseek-ai/dsh-package-manifest": "0.2.2-rc.5",
-    "@deepseek-ai/dsh-storage-domain": "0.2.2-rc.5",
-    "@deepseek-ai/dsh-typert-generator": "0.2.2-rc.5",
-    "@deepseek-ai/dsh-typert-protocol": "0.2.2-rc.5",
+    "@deepseek-ai/dsh-package-manifest": "0.2.3-alpha.2",
+    "@deepseek-ai/dsh-llm": "0.2.3-alpha.2",
+    "@deepseek-ai/dsh-storage-domain": "0.2.3-alpha.2",
+    "@deepseek-ai/dsh-typert-generator": "0.2.3-alpha.2",
+    "@deepseek-ai/dsh-typert-protocol": "0.2.3-alpha.2",
     "@types/node": "^24.10.0",
     "tsdown": "^0.15.11",
     "typescript": "^5.9.3",
